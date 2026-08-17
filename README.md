@@ -43,6 +43,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 | 문서 | 내용 |
 |---|---|
+| [docs/시스템-정의서.md](docs/시스템-정의서.md) | **시스템 정의 — 개념·모델·규칙·불변식** |
 | [docs/프로그램-소개.md](docs/프로그램-소개.md) | **화면 6장으로 보는 프로그램 소개** |
 | [CLAUDE.md](CLAUDE.md) | 인계 문서 — 개발하려면 먼저 읽으세요 |
 | [docs/PRD.md](docs/PRD.md) | 개발 명세. 입력·계산·화면·검수 기준 |

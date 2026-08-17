@@ -143,6 +143,11 @@ def by_channel(db: Session, period: str, ptype: str = "MONTH") -> list[Row]:
             select(func.count()).select_from(SalesLine)
             .where(SalesLine.channel_id == r.key, _period_filter(period, ptype), MAPPED,
                    SalesLine.confidence == "ESTIMATED"))
+        # 실적 수수료를 주는 채널은 fee_rate_used 가 비어 있다.
+        # 그럴 때는 실현 요율(수수료 ÷ 매출)로 채운다 — 화면에 '—' 가 뜨면
+        # 요율을 모르는 채널처럼 보이지만, 사실은 실적값을 그대로 쓴 것이다.
+        if fee_rate is None and r.revenue:
+            fee_rate = r.fee / r.revenue
         r.extra = {"fee_rate": fee_rate, "estimated": bool(est)}
     return rows
 
