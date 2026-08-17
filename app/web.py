@@ -22,13 +22,14 @@ from app.models import (
     UploadBatch, UploadFile,
 )
 from app.seed import PLAN_CHANNEL_ID
-from app.seed.data import ACTUAL_REVENUE_APR_MAY, SKUS, TIERS, UNRESOLVED_ROWS
+from app.seed.data import TIERS, UNRESOLVED_ROWS
 from app.services import export as ex
 from app.services import ingest as ing
 from app.services import mapping as mp
 from app.services import report as rp
 from app.services.calc import (
-    CalcError, breakeven_price, compute, cost_for_margin, get_fee_rate, price_for_margin,
+    CalcError, breakeven_price, compute, cost_for_margin, get_fee_rate, get_sku_cost,
+    price_for_margin,
 )
 
 BASE = Path(__file__).parent
@@ -301,27 +302,44 @@ def deals(request: Request, period: str | None = None, type: str = "MONTH",
 
 @app.get("/products")
 def products(request: Request):
+    """제품 DB — 마스터는 DB에서 읽는다 (업로드로 들어오므로 시드 상수에 기대지 않는다)."""
     with SessionLocal() as db:
-        periods = _periods(db, "MONTH") or ["—"]
-        period = _default_period(db, "MONTH", periods)
-        actual = {r.key: r for r in rp.by_product(db, period)}
+        periods = _periods(db, "MONTH")
+        period = _default_period(db, "MONTH", periods) if periods else "—"
+        on = ref_date(period, "MONTH")
+        actual = {r.key: r for r in rp.by_product(db, period)} if periods else {}
 
         rows = []
-        for s in SKUS:
-            sku_id, name, spec, cost, pack = s[0], s[1], s[2], s[3], s[4]
+        for sku in db.scalars(select(Sku).order_by(Sku.id)).all():
+            deals = db.scalars(
+                select(Deal).where(Deal.primary_sku_id == sku.id,
+                                   Deal.channel_id.is_(None))).all()
+            by_tier = {d.tier: d for d in deals}
+            if not by_tier:
+                continue
+            pack = max((sum(c.qty for c in d.components) for d in deals), default=1)
+            try:
+                cost = get_sku_cost(db, sku.id, on)
+            except CalcError:
+                cost = None
+
             plan, prices = [], []
-            for tier, idx in TIERS:
-                d = db.get(Deal, f"{sku_id}-X{pack}-{tier}")
-                prices.append(d.price)
+            for tier, _ in TIERS:
+                d = by_tier.get(tier)
+                prices.append(d.price if d else None)
+                if d is None:
+                    plan.append(None)
+                    continue
                 try:
-                    r = compute(db, channel_id=PLAN_CHANNEL_ID, deal=d,
-                                order_date="2026-07-15", qty=1, gross_amount=d.price)
+                    r = compute(db, channel_id=PLAN_CHANNEL_ID, deal=d, order_date=on,
+                                qty=1, gross_amount=d.price)
                     plan.append(r.margin_rate)
                 except CalcError:
                     plan.append(None)
-            a = actual.get(sku_id)
-            rows.append({"sku_id": sku_id, "name": name, "spec": spec, "cost": cost, "pack": pack,
-                         "prices": prices, "plan": plan,
+
+            a = actual.get(sku.id)
+            rows.append({"sku_id": sku.id, "name": sku.name, "spec": sku.spec or "",
+                         "cost": cost, "pack": pack, "prices": prices, "plan": plan,
                          "qty": a.qty if a else 0, "profit": a.profit if a else None,
                          "margin": a.margin if a else None})
         rows.sort(key=lambda r: (r["plan"][2] if r["plan"][2] is not None else 9))
@@ -331,11 +349,15 @@ def products(request: Request):
 
 @app.get("/channels")
 def channels(request: Request):
+    """채널 관리 — 매출은 실제 적재된 원장에서 집계한다."""
     with SessionLocal() as db:
-        total_rev = sum(sum(v) for v in ACTUAL_REVENUE_APR_MAY.values())
         palette = ["#3b5bdb", "#4c6ef5", "#5c7cfa", "#748ffc", "#91a7ff", "#a3b8ff"]
 
-        on = date.today().isoformat()
+        periods = _periods(db, "MONTH")
+        period = _default_period(db, "MONTH", periods) if periods else "—"
+        on = ref_date(period, "MONTH")
+        rev_by_ch = {r.key: r.revenue for r in rp.by_channel(db, period)} if periods else {}
+        total_rev = sum(rev_by_ch.values())
 
         def enrich(c):
             try:
@@ -345,13 +367,14 @@ def channels(request: Request):
             logi = db.scalar(
                 select(ChannelLogistics).where(ChannelLogistics.channel_id == c.id)
                 .order_by(ChannelLogistics.effective_from.desc()))
-            rev = sum(ACTUAL_REVENUE_APR_MAY.get(c.id, (0, 0)))
+            rev = rev_by_ch.get(c.id, 0)
             return {"id": c.id, "name": c.name, "group_name": c.group_name,
                     "fee_base": c.fee_base, "ship_owner": c.ship_owner,
                     "settle_date_src": c.settle_date_src, "note": c.note or "",
                     "fee_rate": fee, "logi_amount": logi.flat_amount if logi else None,
                     "logi_est": bool(logi.is_estimate) if logi else False,
-                    "revenue": rev, "share": round(rev / total_rev * 100, 1)}
+                    "revenue": rev,
+                    "share": round(rev / total_rev * 100, 1) if total_rev else 0.0}
 
         active = [enrich(c) for c in db.scalars(
             select(Channel).where(Channel.status == "ACTIVE").order_by(Channel.sort_order)).all()]
@@ -361,14 +384,18 @@ def channels(request: Request):
         cov = [{"name": c["name"], "pct": c["share"], "color": palette[i % len(palette)], "muted": False}
                for i, c in enumerate(active)]
         wsum = sum(c["revenue"] for c in waiting)
-        cov.append({"name": f"대기 {len(waiting)}개", "pct": round(wsum / total_rev * 100, 1),
-                    "color": "var(--surface-2)", "muted": True})
+        if waiting:
+            cov.append({"name": f"대기 {len(waiting)}개",
+                        "pct": round(wsum / total_rev * 100, 1) if total_rev else 0.0,
+                        "color": "var(--surface-2)", "muted": True})
         fees = [c["fee_rate"] for c in active + waiting if c["fee_rate"]]
 
         return templates.TemplateResponse(request, "channels.html", ctx(
             request, "channels", db, active=active, waiting=waiting, coverage=cov,
             cover_pct=round(sum(c["share"] for c in active), 1), waiting_sum=wsum,
-            fee_min=round(min(fees) * 100, 1), fee_max=round(max(fees) * 100, 1)))
+            period=period,
+            fee_min=round(min(fees) * 100, 1) if fees else None,
+            fee_max=round(max(fees) * 100, 1) if fees else None))
 
 
 @app.get("/mapping")

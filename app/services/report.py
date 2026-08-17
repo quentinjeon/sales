@@ -26,12 +26,16 @@ def period_keys(d: date) -> tuple[str, str]:
 
 
 def prev_period(period: str, ptype: str) -> str:
-    if ptype == "MONTH":
-        y, m = map(int, period.split("-"))
-        return f"{y-1}-12" if m == 1 else f"{y}-{m-1:02d}"
-    y, w = int(period[:4]), int(period[6:])
-    monday = date.fromisocalendar(y, w, 1) - timedelta(days=7)
-    return period_keys(monday)[1]
+    """직전 기간 키. 기간 키 형식이 아니면 빈 문자열 — 데이터가 없는 화면에서도 죽지 않는다."""
+    try:
+        if ptype == "MONTH":
+            y, m = map(int, period.split("-"))
+            return f"{y-1}-12" if m == 1 else f"{y}-{m-1:02d}"
+        y, w = int(period[:4]), int(period[6:])
+        monday = date.fromisocalendar(y, w, 1) - timedelta(days=7)
+        return period_keys(monday)[1]
+    except (ValueError, IndexError):
+        return ""
 
 
 def weeks_in_month(db: Session, month: str) -> list[str]:

@@ -12,15 +12,15 @@
   <div class="kpi"><div class="k">활성 채널</div><div class="v num">{{ active|length }}<span class="u">개</span></div>
     <div class="d">전체 {{ active|length + waiting|length }}개 중</div></div>
   <div class="kpi"><div class="k">커버 매출 비중</div><div class="v num">{{ cover_pct }}<span class="u">%</span></div>
-    <div class="d">4~5월 실적 기준</div></div>
+    <div class="d">{{ period }} 실적 기준</div></div>
   <div class="kpi"><div class="k">대기 채널</div><div class="v num">{{ waiting|length }}<span class="u">개</span></div>
     <div class="d">등록만 되어 있음</div></div>
-  <div class="kpi"><div class="k">수수료율 범위</div><div class="v num">{{ fee_min }}~{{ fee_max }}<span class="u">%</span></div>
+  <div class="kpi"><div class="k">수수료율 범위</div><div class="v num">{% if fee_min is none %}—{% else %}{{ fee_min }}~{{ fee_max }}<span class="u">%</span>{% endif %}</div>
     <div class="d">실측 기준</div></div>
 </div>
 
 <div class="card" style="margin-bottom:16px">
-  <div class="card-hd"><h2>채널 커버리지</h2><span class="note">2026년 4~5월 실적 매출 88,401,721원 기준</span></div>
+  <div class="card-hd"><h2>채널 커버리지</h2><span class="note">{{ period }} 적재된 매출 기준</span></div>
   <div class="card-bd">
     <div class="cov">{% for s in coverage %}
       <div style="width:{{ s.pct }}%;background:{{ s.color }}{% if s.muted %};color:var(--text-3){% endif %}">
@@ -51,7 +51,7 @@
   <div class="card-hd"><h2>대기 채널</h2><span class="note">등록만 되어 있고 계산에는 미포함 · 확장 순서대로</span>
     <div class="right"><span class="tag mut">활성화 = 상태 변경 하나</span></div></div>
   <div class="tw"><table class="t">
-    <thead><tr><th class="c">순서</th><th>채널</th><th>그룹</th><th class="r">4~5월 매출</th><th class="r">비중</th>
+    <thead><tr><th class="c">순서</th><th>채널</th><th>그룹</th><th class="r">{{ period }} 매출</th><th class="r">비중</th>
       <th class="c">수수료율</th><th>확인 필요 사항</th></tr></thead>
     <tbody>{% for c in waiting %}<tr class="row-wait">
       <td class="c"><span class="tag {{ 'acc' if loop.index<=3 else '' }}">{{ loop.index }}</span></td>
