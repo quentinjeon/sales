@@ -47,7 +47,7 @@
 | 웹 화면 6개 + 업로드/내보내기 | ✅ | `app/web.py`, `app/templates/` |
 | 마스터 시드 · 데모 생성기 | ✅ | `app/seed/`, `app/demo.py` |
 | 수집함 진단 | ✅ | `app/inbox.py` |
-| 테스트 64건 | ✅ | `tests/` |
+| 테스트 65건 | ✅ | `tests/` |
 | 반품·쿠폰 · 월말 정산 대사 | ❌ | P1 (§6) |
 
 ---
@@ -77,7 +77,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | `python -m app.inbox [기간]` | 수집함 파일 진단 |
 | `python docs/lecture/실습데이터_생성.py` | 실습 엑셀 3종 + 정답지 2종 생성 |
 | `python mock/generate.py` | 화면 기획 HTML 6장 생성 |
-| `python -m pytest -q` | 테스트 64건 |
+| `python -m pytest -q` | 테스트 65건 |
 
 ### 엑셀로 데이터 넣기
 

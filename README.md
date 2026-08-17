@@ -94,7 +94,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | 결과 엑셀 내보내기 | ✅ | `app/services/export.py` |
 | 리포트 집계 | ✅ | `app/services/report.py` |
 | 웹 화면 6개 | ✅ | `app/web.py`, `app/templates/` |
-| 테스트 64건 | ✅ | `tests/` |
+| 테스트 65건 | ✅ | `tests/` |
 | 반품·쿠폰 · 정산 대사 | ❌ | P1 |
 
 ```bash
