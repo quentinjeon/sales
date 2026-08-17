@@ -432,6 +432,37 @@ def mapping_page(request: Request, period: str | None = None):
                                  "score": s.score} for s in sug if s.score > 0.3],
             })
 
+        # 매핑 완료 목록 — 무엇이 어디에 붙었는지 보이고, 되돌릴 수 있어야 한다
+        MATCH_KO = {"EXACT": ("자동", "mut"), "SUGGESTED_ACCEPTED": ("직접", "acc"),
+                    "MANUAL": ("직접", "acc"), "COMPOSED": ("조합", "pos")}
+        rules = {(r.channel_id, r.raw_product_key, r.raw_option_key): r
+                 for r in db.scalars(select(NameMapping)).all()}
+        mapped = []
+        for ch, prod, opt, did, cnt, amt, qty in db.execute(
+                select(SalesLine.channel_id, SalesLine.raw_product_name,
+                       SalesLine.raw_option_name, SalesLine.deal_id, func.count(),
+                       func.sum(SalesLine.gross_amount), func.sum(SalesLine.qty))
+                .where(SalesLine.map_status == "MAPPED", SalesLine.period_month == period)
+                .group_by(SalesLine.channel_id, SalesLine.raw_product_name,
+                          SalesLine.raw_option_name, SalesLine.deal_id)
+                .order_by(func.sum(SalesLine.gross_amount).desc())).all():
+            deal = db.get(Deal, did)
+            if deal is None:
+                continue
+            rule = rules.get((ch, mp.normalize(prod), mp.normalize(opt)))
+            kind, tone = MATCH_KO.get(rule.match_type if rule else "EXACT", ("자동", "mut"))
+            unit = round(amt / qty) if qty else 0
+            gap = unit - deal.price
+            mapped.append({
+                "channel_id": ch, "channel_name": names.get(ch, ch),
+                "product": prod, "option": opt, "count": cnt, "amount": amt,
+                "deal_id": did, "deal_label": deal.label, "tier": deal.tier,
+                "deal_price": deal.price, "unit_price": unit, "gap": gap,
+                "mismatch": deal.price and abs(gap) / deal.price > 0.01,
+                "kind": kind, "tone": tone, "manual": kind != "자동",
+            })
+        mapped.sort(key=lambda m: (not m["mismatch"], not m["manual"], -m["amount"]))
+
         # 직접 고르기용 전체 딜 목록 · 조합용 SKU 목록
         all_deals = [{"id": d.id, "label": d.label, "tier": d.tier, "price": d.price}
                      for d in db.scalars(
@@ -456,7 +487,7 @@ def mapping_page(request: Request, period: str | None = None):
 
         return templates.TemplateResponse(request, "mapping.html", ctx(
             request, "mapping", db, period=period, q=q, groups=groups, by_channel=per_ch,
-            all_deals=all_deals, all_skus=all_skus,
+            all_deals=all_deals, all_skus=all_skus, mapped=mapped,
             rule_count=db.scalar(select(func.count()).select_from(NameMapping)) or 0))
 
 
@@ -480,6 +511,31 @@ def mapping_accept(channel_id: str = Form(...), product: str = Form(...),
                 except CalcError as e:
                     ln.map_status, ln.map_note = "UNMAPPED", str(e)
                     clear_calc(ln)
+        db.commit()
+    return RedirectResponse(f"/mapping?period={period}", status_code=303)
+
+
+@app.post("/mapping/reset")
+def mapping_reset(channel_id: str = Form(...), product: str = Form(...),
+                  option: str = Form(""), period: str = Form(...)):
+    """매핑을 풀어 미매핑 큐로 되돌린다. 규칙도 함께 지운다.
+
+    규칙을 남겨 두면 다음 재계산에서 같은 딜로 다시 붙어 버린다.
+    """
+    with SessionLocal() as db:
+        pkey, okey = mp.normalize(product), mp.normalize(option)
+        db.query(NameMapping).filter(
+            NameMapping.channel_id == channel_id,
+            NameMapping.raw_product_key == pkey,
+            NameMapping.raw_option_key == okey).delete(synchronize_session=False)
+
+        from app.services.calc import clear_calc
+        for ln in db.scalars(select(SalesLine).where(
+                SalesLine.channel_id == channel_id,
+                SalesLine.raw_product_name == product,
+                SalesLine.raw_option_name == option)).all():
+            ln.deal_id, ln.map_status, ln.map_note = None, "UNMAPPED", None
+            clear_calc(ln)
         db.commit()
     return RedirectResponse(f"/mapping?period={period}", status_code=303)
 
