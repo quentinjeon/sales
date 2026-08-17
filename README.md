@@ -50,6 +50,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | [docs/목업데이터-소개.md](docs/목업데이터-소개.md) | 상품 DB · 채널 DB · 매출 데이터 · 결과 리포트 |
 | [docs/lecture/README.md](docs/lecture/README.md) | 바이브코딩 수업 진행 순서 |
 | [docs/lecture/바이브코딩-시작하기.md](docs/lecture/바이브코딩-시작하기.md) | 입문자용 8단계 가이드 |
+| [docs/lecture/바이브코딩-15단계.md](docs/lecture/바이브코딩-15단계.md) | **15단계 제작 순서** — 단계별 프롬프트와 확인할 숫자 |
 | [docs/inbox/README.md](docs/inbox/README.md) | 파일 요청·업로드 안내 |
 
 ---
