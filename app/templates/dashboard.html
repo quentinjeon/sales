@@ -146,12 +146,16 @@
     <div class="card">
       <div class="card-hd"><h2>매출 100원의 행방</h2></div>
       <div class="card-bd">
+        {% if share %}
         <div class="mixbar">
           <div style="width:{{ share.cogs }}%;background:#8b93a3">원가 {{ share.cogs }}%</div>
           <div style="width:{{ share.logi }}%;background:#a9b0bd">물류 {{ share.logi }}%</div>
           <div class="slim" style="width:{{ share.fee }}%;background:#c3c8d2">{{ share.fee }}%</div>
           <div class="slim" style="width:{{ share.profit }}%;background:var(--pos)">{{ share.profit }}%</div>
         </div>
+        {% else %}
+        <div class="psub">매출 데이터가 없습니다. <a class="plain" href="/upload">엑셀을 올려주세요 →</a></div>
+        {% endif %}
         <dl class="kv" style="margin-top:14px">
           <dt>상품 원가</dt><dd class="num">{{ t.cogs|comma }}</dd>
           <dt>물류비</dt><dd class="num">{{ t.logistics|comma }}</dd>

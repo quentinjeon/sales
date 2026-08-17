@@ -13,6 +13,7 @@ from fastapi import FastAPI, File, Form, Request, UploadFile as FUpload
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import StrictUndefined
 from markupsafe import Markup
 from sqlalchemy import func, select
 
@@ -37,6 +38,9 @@ BASE = Path(__file__).parent
 app = FastAPI(title="온담식품 수익률 관리")
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 templates = Jinja2Templates(directory=BASE / "templates")
+# 템플릿에 없는 변수를 쓰면 조용히 빈 값으로 렌더된다 — 드롭다운이 통째로 비어도
+# 화면은 200으로 뜬다. 이름을 틀리면 즉시 터지도록 바꾼다.
+templates.env.undefined = StrictUndefined
 
 TIER_KO = {"NORMAL": "정상가", "EVENT": "일반행사", "SPECIAL": "특가"}
 FEE_BASE_KO = {"PRICE": "판매가", "SUPPLY": "공급가", "PURCHASE": "매입가"}
@@ -452,6 +456,7 @@ def mapping_page(request: Request, period: str | None = None):
 
         return templates.TemplateResponse(request, "mapping.html", ctx(
             request, "mapping", db, period=period, q=q, groups=groups, by_channel=per_ch,
+            all_deals=all_deals, all_skus=all_skus,
             rule_count=db.scalar(select(func.count()).select_from(NameMapping)) or 0))
 
 
