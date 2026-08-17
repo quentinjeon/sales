@@ -508,6 +508,7 @@ async def upload_files(
     products: FUpload | None = File(None),
     channels: FUpload | None = File(None),
     period: str = Form(""),
+    replace: str = Form(""),
 ):
     """엑셀 업로드 → 적재 → 매핑 → 손익 계산 (PRD §4·§11).
 
@@ -531,12 +532,21 @@ async def upload_files(
             if "channels" in saved:
                 n = ing.load_channels(db, saved["channels"])
                 msg.append(f"채널 {n['channels']}개 등록")
-            r = ing.load_sales(db, saved["sales"], period=period or None, uploaded_by="web")
+            r = ing.load_sales(db, saved["sales"], period=period or None,
+                               uploaded_by="web", replace=bool(replace))
             db.commit()
+            if r.replaced_lines:
+                msg.append(f"기존 {r.replaced_lines:,}건 삭제(교체)")
             msg.append(f"{r.period} 주문 {r.lines:,}건 적재 · 매핑 {r.mapped:,} "
                        f"· 미매핑 {r.unmapped} · 계산 {r.calculated:,}")
-            if r.skipped_sheets:
-                msg.append("건너뜀: " + ", ".join(r.skipped_sheets))
+            skipped = []
+            if r.dup_existing:
+                skipped.append(f"이미 적재된 주문 {r.dup_existing:,}건 제외")
+            if r.dup_in_file:
+                skipped.append(f"파일 내 중복 {r.dup_in_file:,}건 제외")
+            skipped += r.skipped_sheets
+            if skipped:
+                msg.append(" · ".join(skipped))
             target = r.period
         except ing.IngestError as e:
             db.rollback()

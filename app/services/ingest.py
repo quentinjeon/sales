@@ -13,12 +13,13 @@
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
 from openpyxl import load_workbook
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -65,6 +66,9 @@ class SalesResult:
     calc_error: int = 0
     skipped_sheets: list[str] = field(default_factory=list)
     gross_sum: int = 0
+    dup_in_file: int = 0        # 같은 파일 안에서 중복된 행
+    dup_existing: int = 0       # 이미 적재된 주문과 겹친 행
+    replaced_lines: int = 0     # 교체 모드에서 지운 기존 행
 
 
 # ── 시트 읽기 ───────────────────────────────────────────────────────────
@@ -227,10 +231,65 @@ def load_channels(db: Session, path: str | Path, effective_from: str = "2026-01-
 
 # ── ③ 매출 원장 ────────────────────────────────────────────────────────
 
+def file_digest(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def find_duplicate_file(db: Session, digest: str) -> UploadFile | None:
+    """같은 내용의 파일이 이미 적재되어 있는가 (§7.6 중복 방지)."""
+    return db.scalar(
+        select(UploadFile).where(UploadFile.sha256 == digest)
+        .order_by(UploadFile.id.desc()))
+
+
+def _existing_keys(db: Session, channel_id: str) -> set[tuple]:
+    """이 채널에 이미 적재된 주문 키. 같은 주문번호는 같은 주문이다."""
+    return set(db.execute(
+        select(SalesLine.order_no, SalesLine.order_line_no, SalesLine.raw_option_name)
+        .where(SalesLine.channel_id == channel_id)).all())
+
+
+def wipe_period(db: Session, channel_id: str, period: str) -> int:
+    """한 채널의 한 기간 데이터를 지운다 (교체 업로드용). 지운 행 수를 돌려준다."""
+    fids = set(db.scalars(
+        select(SalesLine.file_id).where(SalesLine.channel_id == channel_id,
+                                        SalesLine.period_month == period)).all())
+    n = db.query(SalesLine).filter(
+        SalesLine.channel_id == channel_id,
+        SalesLine.period_month == period).delete(synchronize_session=False)
+    for fid in fids:                     # 라인이 하나도 안 남은 파일 행은 같이 정리
+        if not db.scalar(select(func.count()).select_from(SalesLine)
+                         .where(SalesLine.file_id == fid)):
+            db.query(UploadFile).filter(UploadFile.id == fid).delete(
+                synchronize_session=False)
+    db.flush()
+    return n
+
+
 def load_sales(db: Session, path: str | Path, *, period: str | None = None,
-               uploaded_by: str | None = None) -> SalesResult:
-    """매출 엑셀(채널별 시트) → sales_line, 그리고 매핑 → 손익 계산까지."""
+               uploaded_by: str | None = None, replace: bool = False) -> SalesResult:
+    """매출 엑셀(채널별 시트) → sales_line, 그리고 매핑 → 손익 계산까지.
+
+    중복 방지 3단계 (PRD §7.6):
+      ① 같은 파일(sha256)이 이미 적재되어 있으면 거부한다
+      ② 이미 적재된 주문번호와 겹치는 행은 건너뛴다
+      ③ replace=True 면 해당 채널×기간을 지우고 새로 넣는다
+
+    ①②가 없으면 같은 파일을 두 번 올릴 때 매출이 그대로 두 배가 된다.
+    """
     path = Path(path)
+    digest = file_digest(path)
+
+    if not replace:
+        dup = find_duplicate_file(db, digest)
+        if dup is not None:
+            total = db.scalar(select(func.coalesce(func.sum(UploadFile.row_count), 0))
+                              .where(UploadFile.sha256 == digest)) or 0
+            raise IngestError(
+                f"이미 올린 파일입니다 — '{dup.filename}' "
+                f"({(dup.created_at or '')[:10]} 적재 · {total:,}건). "
+                f"같은 기간을 다시 계산하려면 '기존 데이터 교체'를 체크하고 올리세요.")
+
     wb = load_workbook(path, data_only=True)
     by_name = {c.name: c.id for c in db.scalars(select(Channel)).all()}
     by_id = {c.id: c.id for c in db.scalars(select(Channel)).all()}
@@ -242,7 +301,8 @@ def load_sales(db: Session, path: str | Path, *, period: str | None = None,
     db.flush()
     res.batch_id = batch.id
 
-    all_lines: list[SalesLine] = []
+    # ── 1단계: 파싱만 한다 (DB 쓰기 전에 기간·중복을 먼저 확정해야 한다) ──
+    parsed: list[tuple[str, list[dict]]] = []
     for ws in wb.worksheets:
         title = ws.title.strip()
         if title.lower() in NOTE_SHEETS:
@@ -261,53 +321,82 @@ def load_sales(db: Session, path: str | Path, *, period: str | None = None,
         if missing:
             raise IngestError(f"[{title}] 필수 컬럼 누락: {', '.join(missing)}")
 
-        f = UploadFile(batch_id=batch.id, channel_id=channel_id, filename=path.name,
-                       stored_path=str(path), sha256="", status="PARSED")
-        db.add(f)
-        db.flush()
-
         seen: set[tuple] = set()
-        n_rows = gross = 0
+        recs: list[dict] = []
         for i, r in enumerate(rows[1:], start=2):
             on = _date(r[idx["주문일"]])
             product = str(r[idx["상품명"]] or "").strip()
             qty = _int(r[idx["수량"]], 0)
-            amount = _int(r[idx["판매금액"]], 0)
             if not on or not product or not qty:
                 continue
             option = str(r[idx["옵션명"]] or "").strip() if "옵션명" in idx else ""
             order_no = (str(r[idx["주문번호"]]).strip() if "주문번호" in idx
                         and r[idx["주문번호"]] else f"{channel_id}-{i:07d}")
-            key = (order_no, option)
-            if key in seen:                          # 같은 파일 안의 중복 행
+            key = (order_no, "1", option)
+            if key in seen:                          # ① 같은 파일 안의 중복 행
+                res.dup_in_file += 1
                 continue
             seen.add(key)
 
             cancelled = 0
             if "취소여부" in idx and r[idx["취소여부"]]:
                 cancelled = int(any(w in str(r[idx["취소여부"]]).lower() for w in CANCEL_WORDS))
-            fee_actual = _int(r[idx["수수료"]], None) if "수수료" in idx else None
-
             pm, pw = period_keys(date.fromisoformat(on))
-            ln = SalesLine(
-                file_id=f.id, channel_id=channel_id, order_no=order_no, order_line_no="1",
-                order_date=on, raw_product_name=product, raw_option_name=option,
-                qty=qty, gross_amount=amount, fee_actual=fee_actual,
-                is_cancelled=cancelled, period_month=pm, period_week=pw,
-                map_status="UNMAPPED")
-            db.add(ln)
-            all_lines.append(ln)
-            n_rows += 1
-            gross += amount
+            recs.append({
+                "key": key, "order_no": order_no, "order_date": on,
+                "product": product, "option": option, "qty": qty,
+                "amount": _int(r[idx["판매금액"]], 0),
+                "fee_actual": _int(r[idx["수수료"]], None) if "수수료" in idx else None,
+                "cancelled": cancelled, "pm": pm, "pw": pw,
+            })
+        if recs:
+            parsed.append((channel_id, recs))
 
-        f.row_count, f.gross_sum = n_rows, gross
+    if not parsed:
+        raise IngestError("읽을 수 있는 채널 시트가 없습니다. 시트명이 채널명과 같아야 합니다.")
+
+    # ── 2단계: 교체 모드면 해당 채널×기간을 먼저 비운다 ──
+    if replace:
+        for channel_id, recs in parsed:
+            for pm in {r["pm"] for r in recs}:
+                res.replaced_lines += wipe_period(db, channel_id, pm)
+
+    # ── 3단계: 이미 적재된 주문과 겹치는 행을 걸러내고 적재한다 ──
+    all_lines: list[SalesLine] = []
+    for channel_id, recs in parsed:
+        existing = _existing_keys(db, channel_id)
+        fresh = [r for r in recs if r["key"] not in existing]
+        res.dup_existing += len(recs) - len(fresh)
+        if not fresh:
+            res.skipped_sheets.append(f"{channel_id} (전부 이미 적재됨)")
+            continue
+
+        f = UploadFile(batch_id=batch.id, channel_id=channel_id, filename=path.name,
+                       stored_path=str(path), sha256=digest, status="PARSED")
+        db.add(f)
+        db.flush()
+
+        gross = 0
+        for r in fresh:
+            db.add(ln := SalesLine(
+                file_id=f.id, channel_id=channel_id, order_no=r["order_no"],
+                order_line_no="1", order_date=r["order_date"],
+                raw_product_name=r["product"], raw_option_name=r["option"],
+                qty=r["qty"], gross_amount=r["amount"], fee_actual=r["fee_actual"],
+                is_cancelled=r["cancelled"], period_month=r["pm"], period_week=r["pw"],
+                map_status="UNMAPPED"))
+            all_lines.append(ln)
+            gross += r["amount"]
+
+        f.row_count, f.gross_sum = len(fresh), gross
         res.files += 1
-        res.lines += n_rows
+        res.lines += len(fresh)
         res.gross_sum += gross
         db.flush()
 
-    if not res.files:
-        raise IngestError("읽을 수 있는 채널 시트가 없습니다. 시트명이 채널명과 같아야 합니다.")
+    if not all_lines:
+        raise IngestError(
+            f"새로 적재할 주문이 없습니다 — {res.dup_existing:,}건이 이미 들어와 있습니다.")
 
     stat = mp.map_lines(db, all_lines)
     res.mapped, res.auto_mapped, res.unmapped = stat["mapped"], stat["auto"], stat["unmapped"]

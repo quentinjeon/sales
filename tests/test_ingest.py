@@ -148,3 +148,70 @@ def test_i6_missing_required_column_raises(tmp_path):
         ing.load_channels(s, DATA / "02_채널정보.xlsx")
         with pytest.raises(ing.IngestError, match="필수 컬럼 누락"):
             ing.load_sales(s, path, period=PERIOD)
+
+
+# ── T-I7 · 중복 업로드 방지 ──────────────────────────────────────────────
+
+@pytest.fixture
+def fresh_db():
+    """마스터만 넣은 빈 원장."""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        ing.load_products(s, DATA / "01_상품정보.xlsx")
+        ing.load_channels(s, DATA / "02_채널정보.xlsx")
+        yield s
+
+
+SALES = DATA / f"03_매출_{PERIOD}.xlsx"
+
+
+def test_i7_same_file_twice_is_rejected(fresh_db):
+    """같은 파일을 두 번 올리면 매출이 두 배가 된다 — 반드시 막아야 한다."""
+    ing.load_sales(fresh_db, SALES, period=PERIOD)
+    before = rp.totals(fresh_db, PERIOD).revenue
+
+    with pytest.raises(ing.IngestError, match="이미 올린 파일"):
+        ing.load_sales(fresh_db, SALES, period=PERIOD)
+
+    assert rp.totals(fresh_db, PERIOD).revenue == before
+
+
+def test_i7b_replace_keeps_totals_identical(fresh_db):
+    """교체 업로드는 기존을 지우고 다시 넣으므로 합계가 그대로여야 한다."""
+    ing.load_sales(fresh_db, SALES, period=PERIOD)
+    before = rp.totals(fresh_db, PERIOD)
+
+    r = ing.load_sales(fresh_db, SALES, period=PERIOD, replace=True)
+    after = rp.totals(fresh_db, PERIOD)
+
+    assert r.replaced_lines == 3714
+    assert r.lines == 3714
+    assert (after.revenue, after.profit, after.orders) == \
+           (before.revenue, before.profit, before.orders)
+
+
+def test_i7c_overlapping_orders_are_skipped(fresh_db, tmp_path):
+    """파일 이름·해시가 달라도 이미 적재된 주문번호는 다시 넣지 않는다."""
+    from openpyxl import load_workbook
+    ing.load_sales(fresh_db, SALES, period=PERIOD)
+    before = rp.totals(fresh_db, PERIOD).revenue
+
+    wb = load_workbook(SALES)                     # 내용 동일, 해시만 다른 파일
+    wb["한빛홈쇼핑"]["A1"].comment = None
+    copy = tmp_path / "다시받은파일.xlsx"
+    wb.save(copy)
+
+    with pytest.raises(ing.IngestError, match="이미 들어와 있습니다"):
+        ing.load_sales(fresh_db, copy, period=PERIOD)
+    assert rp.totals(fresh_db, PERIOD).revenue == before
+
+
+def test_i7d_sha256_is_recorded(fresh_db):
+    """upload_file.sha256 이 비어 있으면 중복 검사가 동작할 수 없다."""
+    from app.models import UploadFile as UF
+    from sqlalchemy import select as sel
+    ing.load_sales(fresh_db, SALES, period=PERIOD)
+    digests = set(fresh_db.scalars(sel(UF.sha256)).all())
+    assert len(digests) == 1
+    assert len(digests.pop()) == 64

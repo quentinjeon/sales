@@ -72,6 +72,13 @@
           <div class="field"><label>기간 <span class="psub">(비우면 주문일에서 자동 판별)</span></label>
             <input class="inp" type="text" name="period" placeholder="2026-07"
                    pattern="[0-9]{4}-[0-9]{2}" style="max-width:200px"></div>
+          <div class="field" style="margin-bottom:14px">
+            <label style="display:flex;align-items:center;gap:7px;font-weight:500">
+              <input type="checkbox" name="replace" value="1" style="width:auto;margin:0">
+              기존 데이터 교체 <span class="psub">— 같은 채널·같은 기간의 기존 주문을 지우고 다시 넣습니다</span>
+            </label>
+            <div class="hint">체크하지 않으면 이미 올린 파일과 중복 주문은 자동으로 걸러집니다.</div>
+          </div>
           <button class="btn btn-pri" type="submit">업로드 → 매핑 → 손익 계산</button>
           <span class="psub" style="margin-left:10px">미매핑은 버리지 않고 큐에 남깁니다</span>
         </form>

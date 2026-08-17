@@ -47,7 +47,7 @@
 | 웹 화면 6개 + 업로드/내보내기 | ✅ | `app/web.py`, `app/templates/` |
 | 마스터 시드 · 데모 생성기 | ✅ | `app/seed/`, `app/demo.py` |
 | 수집함 진단 | ✅ | `app/inbox.py` |
-| 테스트 60건 | ✅ | `tests/` |
+| 테스트 64건 | ✅ | `tests/` |
 | 반품·쿠폰 · 월말 정산 대사 | ❌ | P1 (§6) |
 
 ---
@@ -77,7 +77,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 | `python -m app.inbox [기간]` | 수집함 파일 진단 |
 | `python docs/lecture/실습데이터_생성.py` | 실습 엑셀 3종 + 정답지 2종 생성 |
 | `python mock/generate.py` | 화면 기획 HTML 6장 생성 |
-| `python -m pytest -q` | 테스트 60건 |
+| `python -m pytest -q` | 테스트 64건 |
 
 ### 엑셀로 데이터 넣기
 
@@ -88,6 +88,7 @@ from app.services import ingest as ing
 ing.load_products(db, "docs/lecture/실습데이터/01_상품정보.xlsx")
 ing.load_channels(db, "docs/lecture/실습데이터/02_채널정보.xlsx")
 ing.load_sales(db, "docs/lecture/실습데이터/03_매출_2026-07.xlsx", period="2026-07")
+# 같은 파일을 다시 넣으려면 replace=True (해당 채널×기간을 지우고 재적재)
 ```
 
 **빈 DB에 엑셀 3장만 넣어도 정답지와 같은 숫자가 나옵니다** — `tests/test_ingest.py` 가 이걸 지킵니다.
@@ -133,6 +134,7 @@ ing.load_sales(db, "docs/lecture/실습데이터/03_매출_2026-07.xlsx", period
 | **금액은 원 단위 정수** | 부동소수점 금액 금지 |
 | **요율 근거가 `ESTIMATE`일 때만 `추정` 배지** | 실측을 추정처럼 보여도, 추정을 실측처럼 보여도 잘못된 판단을 부름 |
 | **필수 컬럼이 없으면 예외** | 빈 값으로 채우면 매출이 증발함 |
+| **같은 파일·같은 주문은 두 번 적재하지 않는다** | 재업로드 한 번에 매출이 그대로 두 배가 됨 |
 
 ---
 
