@@ -476,6 +476,15 @@ def upload_page(request: Request, ok: str = "", error: str = "",
     with SessionLocal() as db:
         periods = _periods(db, "MONTH") or ["—"]
         period = period if period in periods else _default_period(db, "MONTH", periods)
+        # 단계별 완료 여부 — 상품 → 채널 → 매출 순서로 올려야 한다
+        steps = {
+            "skus": db.scalar(select(func.count()).select_from(Sku)) or 0,
+            "deals": db.scalar(select(func.count()).select_from(Deal)) or 0,
+            "channels": db.scalar(select(func.count()).select_from(Channel)) or 0,
+            "active": db.scalar(select(func.count()).select_from(Channel)
+                                .where(Channel.status == "ACTIVE")) or 0,
+            "lines": db.scalar(select(func.count()).select_from(SalesLine)) or 0,
+        }
         t = rp.totals(db, period)
         q = rp.quality(db, period)
         names = {c.id: c.name for c in db.scalars(select(Channel)).all()}
@@ -497,63 +506,96 @@ def upload_page(request: Request, ok: str = "", error: str = "",
                  for i, (n, p) in enumerate(CHANNEL_FILE_GUIDE)]
         return templates.TemplateResponse(request, "upload.html", ctx(
             request, "upload", db, period=period, t=t, q=q, files=files, guide=guide,
-            ok=ok, error=error,
+            ok=ok, error=error, steps=steps,
             waiting_count=db.scalar(select(func.count()).select_from(Channel)
                                     .where(Channel.status == "WAITING")) or 0))
 
 
-@app.post("/upload")
-async def upload_files(
-    sales: FUpload = File(...),
-    products: FUpload | None = File(None),
-    channels: FUpload | None = File(None),
-    period: str = Form(""),
-    replace: str = Form(""),
-):
-    """엑셀 업로드 → 적재 → 매핑 → 손익 계산 (PRD §4·§11).
-
-    상품정보·채널정보는 처음 한 번만 올리면 되고, 매출 파일만 매달 올린다.
-    """
+async def _save_upload(up: FUpload, kind: str) -> Path:
+    """올린 파일을 보관함에 저장한다. 원본을 남겨야 나중에 재적재·대사가 가능하다."""
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    saved: dict[str, Path] = {}
-    for key, up in (("products", products), ("channels", channels), ("sales", sales)):
-        if up is None or not up.filename:
-            continue
-        dest = UPLOAD_DIR / f"{key}_{up.filename}"
-        dest.write_bytes(await up.read())
-        saved[key] = dest
+    dest = UPLOAD_DIR / f"{kind}_{up.filename}"
+    dest.write_bytes(await up.read())
+    return dest
 
-    msg = []
+
+def _back(ok: str = "", error: str = "", period: str = "") -> RedirectResponse:
+    q = []
+    if ok:
+        q.append(f"ok={quote(ok)}")
+    if error:
+        q.append(f"error={quote(error)}")
+    if period:
+        q.append(f"period={period}")
+    return RedirectResponse("/upload" + ("?" + "&".join(q) if q else ""), status_code=303)
+
+
+@app.post("/upload/products")
+async def upload_products(file: FUpload = File(...)):
+    """① 상품정보 — 제품·매입가·구성수량·가격 티어. 처음 한 번만."""
+    path = await _save_upload(file, "products")
     with SessionLocal() as db:
         try:
-            if "products" in saved:
-                n = ing.load_products(db, saved["products"])
-                msg.append(f"제품 {n['skus']}종 · 딜 {n['deals']}개 등록")
-            if "channels" in saved:
-                n = ing.load_channels(db, saved["channels"])
-                msg.append(f"채널 {n['channels']}개 등록")
-            r = ing.load_sales(db, saved["sales"], period=period or None,
+            n = ing.load_products(db, path)
+            db.commit()
+        except (ing.IngestError, KeyError) as e:
+            db.rollback()
+            return _back(error=f"상품정보를 읽을 수 없습니다 — {e}")
+    if not n["skus"] and not n["deals"]:
+        return _back(ok="상품정보: 새로 등록할 제품이 없습니다 (이미 전부 등록됨)")
+    return _back(ok=f"상품정보: 제품 {n['skus']}종 · 딜 {n['deals']}개 등록")
+
+
+@app.post("/upload/channels")
+async def upload_channels(file: FUpload = File(...)):
+    """② 채널정보 — 수수료율·물류비·배송주체. 처음 한 번만."""
+    path = await _save_upload(file, "channels")
+    with SessionLocal() as db:
+        try:
+            n = ing.load_channels(db, path)
+            db.commit()
+        except (ing.IngestError, KeyError) as e:
+            db.rollback()
+            return _back(error=f"채널정보를 읽을 수 없습니다 — {e}")
+    if not n["channels"]:
+        return _back(ok="채널정보: 새로 등록할 채널이 없습니다 (이미 전부 등록됨)")
+    return _back(ok=f"채널정보: 채널 {n['channels']}개 등록")
+
+
+@app.post("/upload/sales")
+async def upload_sales(file: FUpload = File(...), period: str = Form(""),
+                       replace: str = Form("")):
+    """③ 매출 — 매달 올린다. 적재 → 매핑 → 손익 계산까지 한 번에."""
+    with SessionLocal() as db:
+        if not db.scalar(select(func.count()).select_from(Sku)):
+            return _back(error="먼저 ① 상품정보를 올려주세요. 제품이 없으면 원가를 알 수 없습니다.")
+        if not db.scalar(select(func.count()).select_from(Channel)):
+            return _back(error="먼저 ② 채널정보를 올려주세요. 채널이 없으면 수수료를 알 수 없습니다.")
+
+    path = await _save_upload(file, "sales")
+    with SessionLocal() as db:
+        try:
+            r = ing.load_sales(db, path, period=period or None,
                                uploaded_by="web", replace=bool(replace))
             db.commit()
-            if r.replaced_lines:
-                msg.append(f"기존 {r.replaced_lines:,}건 삭제(교체)")
-            msg.append(f"{r.period} 주문 {r.lines:,}건 적재 · 매핑 {r.mapped:,} "
-                       f"· 미매핑 {r.unmapped} · 계산 {r.calculated:,}")
-            skipped = []
-            if r.dup_existing:
-                skipped.append(f"이미 적재된 주문 {r.dup_existing:,}건 제외")
-            if r.dup_in_file:
-                skipped.append(f"파일 내 중복 {r.dup_in_file:,}건 제외")
-            skipped += r.skipped_sheets
-            if skipped:
-                msg.append(" · ".join(skipped))
-            target = r.period
         except ing.IngestError as e:
             db.rollback()
-            return RedirectResponse(f"/upload?error={quote(str(e))}", status_code=303)
+            return _back(error=str(e))
 
-    return RedirectResponse(
-        f"/upload?ok={quote(' · '.join(msg))}&period={target}", status_code=303)
+    msg = []
+    if r.replaced_lines:
+        msg.append(f"기존 {r.replaced_lines:,}건 삭제(교체)")
+    msg.append(f"{r.period} 주문 {r.lines:,}건 적재 · 매핑 {r.mapped:,} "
+               f"· 미매핑 {r.unmapped} · 계산 {r.calculated:,}")
+    skipped = []
+    if r.dup_existing:
+        skipped.append(f"이미 적재된 주문 {r.dup_existing:,}건 제외")
+    if r.dup_in_file:
+        skipped.append(f"파일 내 중복 {r.dup_in_file:,}건 제외")
+    skipped += r.skipped_sheets
+    if skipped:
+        msg.append(" · ".join(skipped))
+    return _back(ok=" · ".join(msg), period=r.period)
 
 
 @app.get("/export")

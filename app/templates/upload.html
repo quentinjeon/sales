@@ -40,47 +40,91 @@
     <div class="de">채널 · 제품 · 딜별<br>이익과 마진율</div></div>
 </div>
 
+{% if not steps.lines %}
+<div class="banner acc">
+  <div class="bi">📥</div>
+  <div><div class="bt">아직 데이터가 없습니다 — 아래 ①②③ 순서로 올려주세요</div>
+    <div class="bd">①상품정보와 ②채널정보는 <b>한 번만</b>, ③매출은 <b>매달</b> 올립니다.</div></div>
+</div>
+{% else %}
 <div class="banner {{ 'pos' if q.unmapped_count==0 else 'warn' }}">
   <div class="bi">{{ '✓' if q.unmapped_count==0 else '⚠' }}</div>
   <div><div class="bt">{{ period }} 처리 완료 — {{ files|length }}개 채널 / {{ t.orders|comma }}건 / 매출 {{ t.revenue|comma }}원</div>
     <div class="bd">{% if q.unmapped_count %}미매핑 <b>{{ q.unmapped_count }}건({{ q.unmapped_amount|comma }}원)</b>은 계산에서 제외되어 있습니다.{% else %}모든 주문이 매핑되어 있습니다.{% endif %}</div></div>
   {% if q.unmapped_count %}<div class="right"><a href="/mapping" class="btn btn-sm">미매핑 처리 →</a></div>{% endif %}
 </div>
+{% endif %}
 
 <div class="g-2-1">
   <div class="stack">
     <div class="card">
-      <div class="card-hd"><h2>파일 업로드</h2><span class="note">채널당 1개 · .xls / .xlsx / .csv</span></div>
+      <div class="card-hd"><h2>① 상품정보</h2>
+        <span class="note">제품·매입가·구성수량·가격 3단계</span>
+        <div class="right">{% if steps.skus %}
+          <span class="tag pos"><span class="dot"></span>제품 {{ steps.skus }}종 · 딜 {{ steps.deals }}개</span>
+        {% else %}<span class="tag mut">아직 없음</span>{% endif %}</div></div>
       <div class="card-bd">
-        <form method="post" action="/upload" enctype="multipart/form-data">
-          <div class="drop" style="padding:20px">
-            <div class="ic">⬆</div>
-            <div class="t">매출 엑셀을 선택하세요 <span class="tag neg">필수</span></div>
-            <div class="d">채널별 시트가 들어 있는 파일 1개 · 시트명이 채널명과 같아야 합니다</div>
-            <div style="margin-top:12px">
-              <input class="inp" type="file" name="sales" accept=".xlsx,.xlsm" required
-                     style="max-width:420px;margin:0 auto"></div>
-          </div>
-          <div class="g2" style="margin-top:14px">
-            <div class="field"><label>상품정보 엑셀 <span class="psub">(처음 한 번만)</span></label>
-              <input class="inp" type="file" name="products" accept=".xlsx,.xlsm">
-              <div class="hint">제품코드·매입가·구성수량·가격 3단계</div></div>
-            <div class="field"><label>채널정보 엑셀 <span class="psub">(처음 한 번만)</span></label>
-              <input class="inp" type="file" name="channels" accept=".xlsx,.xlsm">
-              <div class="hint">채널코드·수수료율·물류비·배송주체</div></div>
-          </div>
-          <div class="field"><label>기간 <span class="psub">(비우면 주문일에서 자동 판별)</span></label>
+        <form method="post" action="/upload/products" enctype="multipart/form-data"
+              style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="inp" type="file" name="file" accept=".xlsx,.xlsm" required
+                 style="flex:1;min-width:220px">
+          <button class="btn{{ ' btn-pri' if not steps.skus }}" type="submit">올리기</button>
+        </form>
+        <div class="psub" style="margin-top:8px">
+          시트명 <code>상품정보</code> · 한 번만 올리면 됩니다. 제품이 늘면 추가로 올리세요.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>② 채널정보</h2>
+        <span class="note">수수료율·물류비·배송주체</span>
+        <div class="right">{% if steps.channels %}
+          <span class="tag pos"><span class="dot"></span>채널 {{ steps.channels }}개 (운영 {{ steps.active }})</span>
+        {% else %}<span class="tag mut">아직 없음</span>{% endif %}</div></div>
+      <div class="card-bd">
+        <form method="post" action="/upload/channels" enctype="multipart/form-data"
+              style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input class="inp" type="file" name="file" accept=".xlsx,.xlsm" required
+                 style="flex:1;min-width:220px">
+          <button class="btn{{ ' btn-pri' if steps.skus and not steps.channels }}" type="submit">올리기</button>
+        </form>
+        <div class="psub" style="margin-top:8px">
+          시트명 <code>채널정보</code> · 수수료가 바뀔 때만 다시 올리면 됩니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>③ 매출 데이터</h2>
+        <span class="note">매달 올립니다 · 채널별 시트</span>
+        <div class="right">{% if steps.lines %}
+          <span class="tag pos"><span class="dot"></span>{{ steps.lines|comma }}건 적재됨</span>
+        {% else %}<span class="tag mut">아직 없음</span>{% endif %}</div></div>
+      <div class="card-bd">
+        {% if not steps.skus or not steps.channels %}
+        <div class="banner warn" style="margin:0 0 14px">
+          <div class="bi">⚠</div>
+          <div><div class="bt">①②를 먼저 올려주세요</div>
+          <div class="bd">제품이 없으면 원가를, 채널이 없으면 수수료를 알 수 없어 손익을 계산할 수 없습니다.</div></div>
+        </div>
+        {% endif %}
+        <form method="post" action="/upload/sales" enctype="multipart/form-data">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="inp" type="file" name="file" accept=".xlsx,.xlsm" required
+                   style="flex:1;min-width:220px">
             <input class="inp" type="text" name="period" placeholder="2026-07"
-                   pattern="[0-9]{4}-[0-9]{2}" style="max-width:200px"></div>
-          <div class="field" style="margin-bottom:14px">
-            <label style="display:flex;align-items:center;gap:7px;font-weight:500">
-              <input type="checkbox" name="replace" value="1" style="width:auto;margin:0">
-              기존 데이터 교체 <span class="psub">— 같은 채널·같은 기간의 기존 주문을 지우고 다시 넣습니다</span>
-            </label>
-            <div class="hint">체크하지 않으면 이미 올린 파일과 중복 주문은 자동으로 걸러집니다.</div>
+                   pattern="[0-9]{4}-[0-9]{2}" style="width:110px" title="비우면 주문일에서 자동 판별">
+            <button class="btn{{ ' btn-pri' if steps.skus and steps.channels }}" type="submit">
+              올리기 → 매핑 → 손익 계산</button>
           </div>
-          <button class="btn btn-pri" type="submit">업로드 → 매핑 → 손익 계산</button>
-          <span class="psub" style="margin-left:10px">미매핑은 버리지 않고 큐에 남깁니다</span>
+          <label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:13px">
+            <input type="checkbox" name="replace" value="1" style="width:auto;margin:0">
+            기존 데이터 교체 <span class="psub">— 같은 채널·기간의 기존 주문을 지우고 다시 넣습니다</span>
+          </label>
+          <div class="psub" style="margin-top:8px">
+            시트명이 <b>채널명</b>과 같아야 합니다. 체크하지 않으면 이미 올린 파일과 중복 주문은 자동으로 걸러집니다.
+          </div>
         </form>
       </div>
     </div>
