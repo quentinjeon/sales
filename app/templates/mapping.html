@@ -16,6 +16,13 @@
 .item .hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12.5px;color:var(--text-3)}
 .gauge{height:8px;border-radius:5px;background:var(--grid);overflow:hidden}
 .gauge div{height:100%;background:var(--pos);border-radius:5px}
+.manual{margin-top:10px;border-top:1px solid var(--grid);padding-top:9px}
+.manual summary{cursor:pointer;font-size:12.5px;color:var(--accent);list-style:none}
+.manual summary::-webkit-details-marker{display:none}
+.manual summary::before{content:"＋ ";font-weight:700}
+.manual[open] summary::before{content:"− "}
+.manual[open] summary{margin-bottom:10px}
+.mrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:7px}
 </style>{% endblock %}
 {% block content %}
 <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
@@ -69,10 +76,64 @@
             {% endfor %}
           </div>
         </div>
+        <details class="manual">
+          <summary>제품 DB에서 직접 고르기</summary>
+          <form method="post" action="/mapping/accept" class="mrow">
+            <input type="hidden" name="channel_id" value="{{ g.channel_id }}">
+            <input type="hidden" name="product" value="{{ g.product }}">
+            <input type="hidden" name="option" value="{{ g.option }}">
+            <input type="hidden" name="period" value="{{ period }}">
+            <select class="sel" name="deal_id" required style="flex:1;min-width:260px">
+              <option value="">— 딜 선택 —</option>
+              {% for d in all_deals %}
+              <option value="{{ d.id }}">{{ d.label }} · {{ tier_ko(d.tier) }} {{ d.price|comma }}원</option>
+              {% endfor %}
+            </select>
+            <button class="btn btn-sm" type="submit">이 딜로 매핑</button>
+          </form>
+        </details>
+
+        <details class="manual"{{ ' open' if g.special }}>
+          <summary>여러 제품을 조합해 새 딜 만들기 {% if g.special %}<span class="tag warn">권장</span>{% endif %}</summary>
+          <div class="psub" style="margin-bottom:10px;line-height:1.6">
+            증정품이나 복합 세트는 기존 딜에 붙이면 <b>빠진 구성의 원가가 통째로 사라집니다.</b>
+            구성 SKU를 모두 담아 새 딜로 등록하세요. 증정품도 반드시 포함해야 합니다.
+          </div>
+          <form method="post" action="/mapping/compose">
+            <input type="hidden" name="channel_id" value="{{ g.channel_id }}">
+            <input type="hidden" name="product" value="{{ g.product }}">
+            <input type="hidden" name="option" value="{{ g.option }}">
+            <input type="hidden" name="period" value="{{ period }}">
+            {% for i in range(4) %}
+            <div class="mrow">
+              <select class="sel" name="sku" style="flex:1;min-width:240px">
+                <option value="">— 구성 제품 {{ i+1 }} —</option>
+                {% for k in all_skus %}<option value="{{ k.id }}">{{ k.name }}</option>{% endfor %}
+              </select>
+              <input class="inp" type="number" name="qty" value="1" min="1" style="width:80px"
+                     title="수량">
+              <select class="sel" name="gift" style="width:92px">
+                <option value="0">판매</option><option value="1">증정</option>
+              </select>
+            </div>
+            {% endfor %}
+            <div class="mrow" style="margin-top:10px">
+              <input class="inp" name="label" style="flex:1;min-width:240px" required
+                     value="{{ g.product[:60] }}" placeholder="딜 이름">
+              <input class="inp" type="number" name="price" style="width:120px" required
+                     value="{{ (g.amount / g.count)|round|int }}" title="판매가(1건)">
+              <select class="sel" name="tier" style="width:110px">
+                <option value="EVENT">일반행사</option>
+                <option value="SPECIAL">특가</option>
+                <option value="NORMAL">정상가</option>
+              </select>
+              <button class="btn btn-sm btn-pri" type="submit">새 딜로 매핑</button>
+            </div>
+          </form>
+        </details>
         {% if g.special %}
         <div class="psub" style="margin-top:9px;line-height:1.6">
-          증정품이나 복합 세트는 기존 딜에 붙이면 <b>원가가 틀어집니다.</b>
-          구성 SKU를 모두 담은 <b>새 딜</b>로 등록해야 합니다 (PRD §8.4).</div>
+          이 이름은 <b>증정품·복합세트</b>로 보입니다 (PRD §8.4).</div>
         {% endif %}
       </div>
       {% endfor %}

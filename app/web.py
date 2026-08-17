@@ -18,7 +18,8 @@ from sqlalchemy import func, select
 
 from app.db import UPLOAD_DIR, SessionLocal
 from app.models import (
-    Channel, ChannelFee, ChannelLogistics, Deal, NameMapping, SalesLine, Sku, SkuCost,
+    Channel, ChannelFee, ChannelLogistics, Deal, DealComponent, NameMapping,
+    SalesLine, Sku, SkuCost,
     UploadBatch, UploadFile,
 )
 from app.seed import PLAN_CHANNEL_ID
@@ -427,6 +428,14 @@ def mapping_page(request: Request, period: str | None = None):
                                  "score": s.score} for s in sug if s.score > 0.3],
             })
 
+        # 직접 고르기용 전체 딜 목록 · 조합용 SKU 목록
+        all_deals = [{"id": d.id, "label": d.label, "tier": d.tier, "price": d.price}
+                     for d in db.scalars(
+                         select(Deal).where(Deal.is_active == 1)
+                         .order_by(Deal.primary_sku_id, Deal.price.desc())).all()]
+        all_skus = [{"id": k.id, "name": k.name}
+                    for k in db.scalars(select(Sku).order_by(Sku.name)).all()]
+
         per_ch = []
         for cid, cname in names.items():
             rules = db.scalar(select(func.count()).select_from(NameMapping)
@@ -452,6 +461,58 @@ def mapping_accept(channel_id: str = Form(...), product: str = Form(...),
     with SessionLocal() as db:
         mp.register(db, channel_id=channel_id, product=product, option=option,
                     deal_id=deal_id, match_type="SUGGESTED_ACCEPTED", actor="web")
+        lines = db.scalars(select(SalesLine).where(
+            SalesLine.channel_id == channel_id,
+            SalesLine.raw_product_name == product,
+            SalesLine.raw_option_name == option,
+            SalesLine.map_status == "UNMAPPED")).all()
+        mp.map_lines(db, lines)
+        from app.services.calc import apply_to_line, clear_calc
+        for ln in lines:
+            if ln.map_status == "MAPPED":
+                try:
+                    apply_to_line(db, ln, db.get(Deal, ln.deal_id))
+                except CalcError as e:
+                    ln.map_status, ln.map_note = "UNMAPPED", str(e)
+                    clear_calc(ln)
+        db.commit()
+    return RedirectResponse(f"/mapping?period={period}", status_code=303)
+
+
+@app.post("/mapping/compose")
+def mapping_compose(
+    channel_id: str = Form(...), product: str = Form(...), option: str = Form(""),
+    period: str = Form(...), label: str = Form(...), price: int = Form(...),
+    tier: str = Form("EVENT"),
+    sku: list[str] = Form([]), qty: list[str] = Form([]), gift: list[str] = Form([]),
+):
+    """여러 SKU를 조합해 새 딜을 만들고 그 이름에 연결한다 (PRD §6 · 복합세트·증정품).
+
+    기존 딜에 붙이면 빠진 구성의 원가가 통째로 사라진다.
+    구성이 다르면 반드시 새 딜이어야 한다.
+    """
+    parts = [(s.strip(), int(q or 1), g == "1")
+             for s, q, g in zip(sku, qty + [""] * len(sku), gift + ["0"] * len(sku))
+             if s and s.strip()]
+    if not parts:
+        return RedirectResponse(
+            f"/mapping?period={period}&error=" + quote("구성 제품을 1개 이상 골라주세요"),
+            status_code=303)
+
+    with SessionLocal() as db:
+        n = db.scalar(select(func.count()).select_from(Deal)
+                      .where(Deal.id.like(f"SET-{channel_id}-%"))) or 0
+        deal_id = f"SET-{channel_id}-{n + 1:03d}"
+        db.add(Deal(id=deal_id, channel_id=channel_id, primary_sku_id=parts[0][0],
+                    label=label.strip() or product[:80], tier=tier, price=price,
+                    effective_from="2026-01-01"))
+        for sku_id, q, is_gift in parts:
+            db.add(DealComponent(deal_id=deal_id, sku_id=sku_id, qty=q,
+                                 is_gift=int(is_gift)))
+        db.flush()
+
+        mp.register(db, channel_id=channel_id, product=product, option=option,
+                    deal_id=deal_id, match_type="COMPOSED", actor="web")
         lines = db.scalars(select(SalesLine).where(
             SalesLine.channel_id == channel_id,
             SalesLine.raw_product_name == product,

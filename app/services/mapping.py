@@ -19,7 +19,11 @@ from app.models import Deal, NameMapping, SalesLine
 # 옵션명에서 구성 배수를 뽑는 패턴 — 'x2개', '×3', '2개세트'
 _PACK_RE = re.compile(r"(?:x|×|\*)\s*(\d+)\s*개?|(\d+)\s*개\s*세트")
 # 증정품·복합세트 신호 — 기존 딜에 붙이면 원가가 틀어진다 (§8.4)
-_SPECIAL_RE = re.compile(r"증정|사은품|\+\s*\d|(\d+)\s*종")
+#   증정/사은품        : 구성에 없는 SKU가 딸려 나간다
+#   '+ 3', '12개 +'    : 여러 품목을 더해 판다
+#   '3종', '세트('     : 구성을 괄호로 나열한 복합 세트
+_SPECIAL_RE = re.compile(
+    r"증정|사은품|\+\s*\d|\d+\s*개\s*\+|(\d+)\s*종|세트\s*\(")
 
 
 def normalize(s: str | None) -> str:

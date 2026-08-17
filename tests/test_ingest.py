@@ -215,3 +215,52 @@ def test_i7d_sha256_is_recorded(fresh_db):
     digests = set(fresh_db.scalars(sel(UF.sha256)).all())
     assert len(digests) == 1
     assert len(digests.pop()) == 64
+
+
+# ── T-I8 · 복합세트 조합 매핑 ────────────────────────────────────────────
+
+def test_i8_composed_set_carries_every_component_cost(fresh_db):
+    """복합세트는 구성 SKU를 모두 담은 새 딜로 매핑해야 원가가 맞는다.
+
+    기존 딜(즉석밥 단품)에 붙이면 즉석국·김자반 원가가 통째로 사라진다.
+    화면의 '여러 제품을 조합해 새 딜 만들기'가 이 경로다.
+    """
+    from app.models import Deal, DealComponent, SalesLine
+    from app.services import mapping as mp
+    from app.services.calc import apply_to_line, deal_unit_cogs
+    from sqlalchemy import select as sel
+
+    ing.load_sales(fresh_db, SALES, period=PERIOD)
+    before = rp.quality(fresh_db, PERIOD)
+
+    target = fresh_db.scalar(
+        sel(SalesLine).where(SalesLine.map_status == "UNMAPPED",
+                             SalesLine.raw_product_name.like("%홈캉스%")))
+    assert target is not None, "복합세트 샘플이 실습 데이터에 있어야 한다"
+
+    fresh_db.add(Deal(id="SET-TEST-001", channel_id=target.channel_id,
+                      primary_sku_id="RICE24", label="홈캉스 세트", tier="EVENT",
+                      price=target.gross_amount, effective_from="2026-01-01"))
+    for sku_id, qty, gift in (("RICE24", 12, 0), ("SOUP15", 8, 0), ("GIM4", 2, 1)):
+        fresh_db.add(DealComponent(deal_id="SET-TEST-001", sku_id=sku_id,
+                                   qty=qty, is_gift=gift))
+    fresh_db.flush()
+
+    deal = fresh_db.get(Deal, "SET-TEST-001")
+    # 760×12 + 980×8 + 1,850×2 — 증정품(김자반)도 반드시 들어간다
+    assert deal_unit_cogs(fresh_db, deal, "2026-07-15") == 760 * 12 + 980 * 8 + 1850 * 2
+
+    mp.register(fresh_db, channel_id=target.channel_id, product=target.raw_product_name,
+                option=target.raw_option_name, deal_id=deal.id, match_type="COMPOSED")
+    lines = fresh_db.scalars(sel(SalesLine).where(
+        SalesLine.channel_id == target.channel_id,
+        SalesLine.raw_product_name == target.raw_product_name,
+        SalesLine.map_status == "UNMAPPED")).all()
+    mp.map_lines(fresh_db, lines)
+    for ln in lines:
+        apply_to_line(fresh_db, ln, deal)
+    fresh_db.flush()
+
+    after = rp.quality(fresh_db, PERIOD)
+    assert after.unmapped_count < before.unmapped_count
+    assert lines[0].cogs == 20660
