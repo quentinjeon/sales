@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상품 DB · 온담식품 수익률 관리</title>
+<style data-src="assets/app.css">
+/* ── 온담식품 온라인 수익률 대시보드 · Mock UI ───────────────────────── */
+
+:root {
+  --bg:        #f7f8fa;
+  --surface:   #ffffff;
+  --surface-2: #f2f4f7;
+  --border:    #e3e6ec;
+  --border-2:  #d3d8e0;
+  --text:      #171b23;
+  --text-2:    #5b6373;
+  --text-3:    #8b93a3;
+  --accent:    #3b5bdb;
+  --accent-bg: #edf0fd;
+  --pos:       #0f8a5f;
+  --pos-bg:    #e6f6ef;
+  --warn:      #b0730a;
+  --warn-bg:   #fdf3e0;
+  --neg:       #c8382f;
+  --neg-bg:    #fdeceb;
+  --grid:      #eceff4;
+  --shadow:    0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+  --radius:    10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0e1116;
+    --surface:   #161a21;
+    --surface-2: #1d222b;
+    --border:    #262c36;
+    --border-2:  #343b47;
+    --text:      #e7eaef;
+    --text-2:    #9aa3b2;
+    --text-3:    #6b7484;
+    --accent:    #7b93f5;
+    --accent-bg: #1b2340;
+    --pos:       #46c78f;
+    --pos-bg:    #10281f;
+    --warn:      #e0a23c;
+    --warn-bg:   #2b2114;
+    --neg:       #f0736a;
+    --neg-bg:    #2e1715;
+    --grid:      #222833;
+    --shadow:    0 1px 2px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:        #0e1116;
+  --surface:   #161a21;
+  --surface-2: #1d222b;
+  --border:    #262c36;
+  --border-2:  #343b47;
+  --text:      #e7eaef;
+  --text-2:    #9aa3b2;
+  --text-3:    #6b7484;
+  --accent:    #7b93f5;
+  --accent-bg: #1b2340;
+  --pos:       #46c78f;
+  --pos-bg:    #10281f;
+  --warn:      #e0a23c;
+  --warn-bg:   #2b2114;
+  --neg:       #f0736a;
+  --neg-bg:    #2e1715;
+  --grid:      #222833;
+  --shadow:    0 1px 2px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard,
+               "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ── 레이아웃 ───────────────────────────────────────────────────────── */
+.shell {
+  display: flex; min-height: 100vh;
+  /* 사이드바는 sticky 라 높이가 뷰포트에 묶인다. 좌측 띠를 배경으로 깔아
+     문서가 길어져도 빈 곳이 생기지 않게 한다. */
+  background: linear-gradient(to right, var(--surface) 0 226px, var(--bg) 226px);
+}
+
+.side {
+  width: 226px; flex: 0 0 226px;
+  border-right: 1px solid var(--border);
+  padding: 18px 12px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.brand { display: flex; align-items: center; gap: 9px; padding: 0 8px 16px; }
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 7px; flex: 0 0 26px;
+  background: linear-gradient(135deg, var(--accent), #7048e8);
+  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700;
+}
+.brand-name { font-weight: 650; font-size: 14px; letter-spacing: -.01em; }
+.brand-sub  { font-size: 11px; color: var(--text-3); margin-top: -2px; }
+
+.nav-label {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-3); padding: 14px 10px 6px;
+}
+.nav a {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; border-radius: 7px; margin-bottom: 1px;
+  color: var(--text-2); text-decoration: none; font-size: 13.5px;
+}
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.nav a .ic { width: 16px; text-align: center; font-size: 13px; opacity: .9; }
+.nav a .badge {
+  margin-left: auto; background: var(--neg); color: #fff;
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px;
+}
+
+.main { flex: 1; min-width: 0; padding: 22px 28px 60px; max-width: 1440px; }
+
+.topbar { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.topbar h1 { font-size: 21px; font-weight: 650; margin: 0 0 3px; letter-spacing: -.02em; }
+.topbar .sub { color: var(--text-2); font-size: 13px; }
+.topbar .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* ── 기본 요소 ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card-hd {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.card-hd h2 { font-size: 14px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.card-hd .note { font-size: 12px; color: var(--text-3); }
+.card-hd .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.card-bd { padding: 16px; }
+
+.btn {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { background: var(--surface-2); }
+.btn-pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn-pri:hover { filter: brightness(1.08); background: var(--accent); }
+.btn-sm { padding: 3px 9px; font-size: 12px; }
+
+.sel {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 7px;
+}
+.inp {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 7px; width: 100%;
+}
+
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  background: var(--surface-2); color: var(--text-2); white-space: nowrap;
+}
+.tag.pos  { background: var(--pos-bg);  color: var(--pos); }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.neg  { background: var(--neg-bg);  color: var(--neg); }
+.tag.acc  { background: var(--accent-bg); color: var(--accent); }
+.tag.mut  { background: transparent; color: var(--text-3); border: 1px dashed var(--border-2); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 6px; }
+
+/* ── KPI ────────────────────────────────────────────────────────────── */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.kpi .k { font-size: 12px; color: var(--text-2); margin-bottom: 7px; display: flex; align-items: center; gap: 5px; }
+.kpi .v { font-size: 25px; font-weight: 660; letter-spacing: -.03em; line-height: 1.15; }
+.kpi .v .u { font-size: 14px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.kpi .d { font-size: 12px; margin-top: 6px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+.kpi .d b { font-weight: 650; }
+.up   { color: var(--pos); }
+.down { color: var(--neg); }
+
+/* ── 테이블 ─────────────────────────────────────────────────────────── */
+.tw { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th {
+  text-align: left; font-weight: 600; font-size: 11.5px; color: var(--text-3);
+  letter-spacing: .03em; padding: 9px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap; position: sticky; top: 0;
+}
+table.t td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+table.t tbody tr:last-child td { border-bottom: 0; }
+table.t tbody tr:hover { background: var(--surface-2); }
+table.t td.r, table.t td.c { white-space: nowrap; }
+table.t .pname { white-space: nowrap; }
+.nw { white-space: nowrap; }
+table.t .r { text-align: right; }
+table.t .c { text-align: center; }
+table.t tfoot td {
+  padding: 10px 12px; border-top: 1px solid var(--border-2); font-weight: 650;
+  background: var(--surface-2);
+}
+.tr-neg  { background: var(--neg-bg)  !important; }
+.tr-warn { background: var(--warn-bg) !important; }
+.pname { font-weight: 550; }
+.psub  { font-size: 11.5px; color: var(--text-3); }
+
+/* 마진율 인라인 바 */
+.mbar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.mbar .track { width: 62px; height: 5px; border-radius: 3px; background: var(--grid); position: relative; overflow: hidden; flex: 0 0 62px; }
+.mbar .fill  { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.mbar .val   { min-width: 54px; text-align: right; font-weight: 600; }
+
+/* ── 폭포(이익 구조) ─────────────────────────────────────────────────── */
+.wf { display: flex; flex-direction: column; gap: 9px; }
+.wf-row { display: grid; grid-template-columns: 116px 1fr 120px; align-items: center; gap: 12px; font-size: 13px; }
+.wf-row .lbl { color: var(--text-2); }
+.wf-row .bar { height: 22px; background: var(--grid); border-radius: 5px; position: relative; }
+.wf-row .seg { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.wf-row .amt { text-align: right; font-weight: 600; }
+
+/* ── 히트맵 ─────────────────────────────────────────────────────────── */
+.hm { border-collapse: separate; border-spacing: 3px; font-size: 12px; }
+.hm th { font-weight: 600; color: var(--text-2); font-size: 11.5px; padding: 4px 6px; white-space: nowrap; }
+.hm th.rowh { text-align: left; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.hm td { text-align: center; padding: 7px 4px; border-radius: 6px; font-weight: 650; min-width: 62px; font-variant-numeric: tabular-nums; }
+.hm td.na { background: var(--surface-2); color: var(--text-3); font-weight: 400; }
+
+/* ── 배너 ───────────────────────────────────────────────────────────── */
+.banner {
+  display: flex; gap: 12px; align-items: flex-start;
+  border-radius: var(--radius); padding: 13px 16px; margin-bottom: 16px; border: 1px solid;
+}
+.banner .bi { font-size: 16px; line-height: 1.3; }
+.banner .bt { font-weight: 650; margin-bottom: 3px; font-size: 13.5px; }
+.banner .bd { font-size: 13px; opacity: .92; }
+.banner .right { margin-left: auto; }
+.banner.neg  { background: var(--neg-bg);  border-color: color-mix(in srgb, var(--neg) 28%, transparent);  color: var(--neg); }
+.banner.warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 28%, transparent); color: var(--warn); }
+.banner.acc  { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 25%, transparent); color: var(--accent); }
+.banner.pos  { background: var(--pos-bg);  border-color: color-mix(in srgb, var(--pos) 25%, transparent);  color: var(--pos); }
+.banner .bd b { font-weight: 700; }
+
+/* ── 그리드 ─────────────────────────────────────────────────────────── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.g-2-1 { display: grid; grid-template-columns: 1.65fr 1fr; gap: 16px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 1080px) { .g2, .g3, .g-2-1 { grid-template-columns: 1fr; } }
+@media (max-width: 860px)  { .side { display: none; } .main { padding: 18px 16px 50px; } }
+
+/* ── 기타 ───────────────────────────────────────────────────────────── */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filters .lb { font-size: 12px; color: var(--text-3); margin-right: -2px; }
+
+.chip {
+  border: 1px solid var(--border-2); background: var(--surface); border-radius: 20px;
+  padding: 4px 11px; font-size: 12.5px; color: var(--text-2); cursor: pointer;
+}
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.field { margin-bottom: 13px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
+.field .hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; font-size: 13px; }
+.kv dt { color: var(--text-2); }
+.kv dd { margin: 0; text-align: right; font-weight: 600; }
+
+.mock-note {
+  margin-top: 26px; padding: 12px 15px; border-radius: 9px;
+  border: 1px dashed var(--border-2); background: var(--surface);
+  font-size: 12.5px; color: var(--text-3); line-height: 1.65;
+}
+.mock-note b { color: var(--text-2); }
+
+.step { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.step:last-child { border-bottom: 0; }
+.step .n {
+  width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11.5px; font-weight: 700; background: var(--surface-2); color: var(--text-2);
+}
+.step.done .n { background: var(--pos); color: #fff; }
+.step.now  .n { background: var(--accent); color: #fff; }
+.step .body { flex: 1; min-width: 0; }
+.step .ti { font-weight: 600; font-size: 13.5px; margin-bottom: 2px; }
+.step .de { font-size: 12.5px; color: var(--text-3); }
+
+a.plain { color: var(--accent); text-decoration: none; }
+a.plain:hover { text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="side">
+  <div class="brand">
+    <div class="brand-mark">온</div>
+    <div><div class="brand-name">온담식품 수익률</div><div class="brand-sub">온라인몰 손익 관리</div></div>
+  </div>
+  <div class="nav">
+    <div class="nav-label">안내</div>
+    <a href="index.html" class=""><span class="ic">🗂</span> 화면 목록</a>
+    <div class="nav-label">인풋</div>
+    <a href="01-상품DB.html" class="on"><span class="ic">📦</span> 상품 DB</a>
+    <a href="02-채널DB.html" class=""><span class="ic">🛒</span> 채널 DB</a>
+    <a href="03-매출데이터.html" class=""><span class="ic">🧾</span> 매출 데이터</a>
+    <div class="nav-label">결과</div>
+    <a href="04-대시보드.html" class=""><span class="ic">📊</span> 수익률 대시보드</a>
+    <a href="05-리포트.html" class=""><span class="ic">📈</span> 상세 리포트</a>
+  </div>
+</aside>
+<main class="main">
+  <div class="topbar">
+    <div><h1>상품 DB</h1><div class="sub">인풋 ① · 제품 23종 · 매입가와 구성수량이 원가를 결정합니다</div></div>
+    <div class="right"><button class="btn btn-sm">엑셀 받기</button></div>
+  </div>
+
+  <div class="banner warn">
+    <div class="bi">⚠</div>
+    <div><div class="bt">특가 기준으로 적자인 제품이 5종 있습니다</div>
+    <div class="bd">수수료 13% · 물류비 3,000원 가정. 붉은 행이 그 제품입니다.
+      <b>구성수량을 빼먹으면</b> 이 표가 전부 흑자로 보입니다 — 가장 흔한 실수입니다.</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>상품 DB</h2>
+      <span class="note">인풋 ① · 01_상품정보.xlsx</span>
+      <div class="right"><span class="tag mut">23종</span></div></div>
+    <div class="tw"><table class="t">
+      <thead><tr>
+        <th>제품코드</th><th>제품명 · 규격</th><th class="r">매입가</th><th class="c">구성</th>
+        <th class="r">원가</th><th class="r">정상가</th><th class="r">행사가</th><th class="r">특가</th>
+        <th class="r">정상 마진</th><th class="r">행사 마진</th><th class="r">특가 마진</th>
+      </tr></thead>
+      <tbody><tr><td class="num psub">TISSUE30</td><td><div class="pname">온담 3겹 데코 화장지 30롤</div><div class="psub">27m x 30롤</div></td><td class="r num">620</td><td class="c num">×30</td><td class="r num">18,600</td><td class="r num">29,900</td><td class="r num">26,900</td><td class="r num">24,900</td><td class="r num pos">14.76%</td><td class="r num pos">6.70%</td><td class="r num warn">0.25%</td></tr><tr><td class="num psub">WIPE10</td><td><div class="pname">온담 캡형 물티슈 100매 10팩</div><div class="psub">100매 x 10팩</div></td><td class="r num">890</td><td class="c num">×10</td><td class="r num">8,900</td><td class="r num">17,900</td><td class="r num">14,900</td><td class="r num">13,900</td><td class="r num pos">20.52%</td><td class="r num pos">7.13%</td><td class="r num warn">1.39%</td></tr><tr class="tr-neg"><td class="num psub">SOFT2</td><td><div class="pname">온담 섬유유연제 2L 2개</div><div class="psub">2L x 2개</div></td><td class="r num">3,900</td><td class="c num">×2</td><td class="r num">7,800</td><td class="r num">16,900</td><td class="r num">13,900</td><td class="r num">11,900</td><td class="r num pos">23.09%</td><td class="r num pos">9.30%</td><td class="r num neg">-3.76%</td></tr><tr><td class="num psub">DISH3</td><td><div class="pname">온담 주방세제 1L 3개</div><div class="psub">1L x 3개</div></td><td class="r num">2,450</td><td class="c num">×3</td><td class="r num">7,350</td><td class="r num">15,900</td><td class="r num">13,900</td><td class="r num">11,900</td><td class="r num pos">21.91%</td><td class="r num pos">12.54%</td><td class="r num warn">0.03%</td></tr><tr><td class="num psub">ZIP3</td><td><div class="pname">온담 지퍼백 대용량 3종</div><div class="psub">소·중·대 각 50매</div></td><td class="r num">2,100</td><td class="c num">×3</td><td class="r num">6,300</td><td class="r num">15,900</td><td class="r num">12,900</td><td class="r num">10,900</td><td class="r num pos">28.51%</td><td class="r num pos">14.91%</td><td class="r num warn">1.68%</td></tr><tr><td class="num psub">CUP1000</td><td><div class="pname">온담 종이컵 1000개입</div><div class="psub">6.5oz x 1000개</div></td><td class="r num">14</td><td class="c num">×1000</td><td class="r num">14,000</td><td class="r num">24,900</td><td class="r num">21,900</td><td class="r num">19,900</td><td class="r num pos">18.73%</td><td class="r num pos">9.37%</td><td class="r num warn">1.57%</td></tr><tr><td class="num psub">RICE24</td><td><div class="pname">온담 무균 즉석밥 210g 24개입</div><div class="psub">210g x 24개</div></td><td class="r num">760</td><td class="c num">×24</td><td class="r num">18,240</td><td class="r num">29,900</td><td class="r num">26,900</td><td class="r num">24,900</td><td class="r num pos">15.96%</td><td class="r num pos">8.04%</td><td class="r num warn">1.70%</td></tr><tr class="tr-neg"><td class="num psub">RAMEN20</td><td><div class="pname">온담 얼큰라면 20개입 멀티팩</div><div class="psub">120g x 20개</div></td><td class="r num">620</td><td class="c num">×20</td><td class="r num">12,400</td><td class="r num">21,900</td><td class="r num">18,900</td><td class="r num">15,900</td><td class="r num pos">16.68%</td><td class="r num pos">5.52%</td><td class="r num neg">-9.86%</td></tr><tr><td class="num psub">SOUP15</td><td><div class="pname">온담 간편 즉석국 15개입</div><div class="psub">300g x 15개</div></td><td class="r num">980</td><td class="c num">×15</td><td class="r num">14,700</td><td class="r num">26,900</td><td class="r num">22,900</td><td class="r num">20,900</td><td class="r num pos">21.20%</td><td class="r num pos">9.71%</td><td class="r num warn">2.31%</td></tr><tr><td class="num psub">TUNA12</td><td><div class="pname">온담 살코기 참치캔 150g 12개</div><div class="psub">150g x 12캔</div></td><td class="r num">1,180</td><td class="c num">×12</td><td class="r num">14,160</td><td class="r num">25,900</td><td class="r num">21,900</td><td class="r num">19,900</td><td class="r num pos">20.75%</td><td class="r num pos">8.64%</td><td class="r num warn">0.77%</td></tr><tr><td class="num psub">GIM4</td><td><div class="pname">온담 볶음 김자반 4개입</div><div class="psub">50g x 4봉</div></td><td class="r num">1,850</td><td class="c num">×4</td><td class="r num">7,400</td><td class="r num">17,900</td><td class="r num">14,900</td><td class="r num">12,900</td><td class="r num pos">28.90%</td><td class="r num pos">17.20%</td><td class="r num pos">6.38%</td></tr><tr class="tr-neg"><td class="num psub">CHICK20</td><td><div class="pname">온담 닭가슴살 100g 20팩</div><div class="psub">100g x 20팩</div></td><td class="r num">1,180</td><td class="c num">×20</td><td class="r num">23,600</td><td class="r num">36,900</td><td class="r num">32,900</td><td class="r num">28,900</td><td class="r num pos">14.91%</td><td class="r num pos">6.15%</td><td class="r num neg">-5.04%</td></tr><tr class="tr-neg"><td class="num psub">CAPSULE100</td><td><div class="pname">온담 커피캡슐 100개입</div><div class="psub">5.5g x 100캡슐</div></td><td class="r num">210</td><td class="c num">×100</td><td class="r num">21,000</td><td class="r num">34,900</td><td class="r num">29,900</td><td class="r num">26,900</td><td class="r num pos">18.23%</td><td class="r num pos">6.73%</td><td class="r num neg">-2.22%</td></tr><tr><td class="num psub">COLDBREW6</td><td><div class="pname">온담 콜드브루 원액 6병</div><div class="psub">500ml x 6병</div></td><td class="r num">1,750</td><td class="c num">×6</td><td class="r num">10,500</td><td class="r num">24,900</td><td class="r num">19,900</td><td class="r num">16,900</td><td class="r num pos">32.78%</td><td class="r num pos">19.16%</td><td class="r num pos">7.12%</td></tr><tr><td class="num psub">JELLY10</td><td><div class="pname">온담 곤약젤리 10팩</div><div class="psub">150g x 10팩</div></td><td class="r num">890</td><td class="c num">×10</td><td class="r num">8,900</td><td class="r num">18,900</td><td class="r num">15,900</td><td class="r num">13,900</td><td class="r num pos">24.04%</td><td class="r num pos">12.16%</td><td class="r num warn">1.39%</td></tr><tr><td class="num psub">NUTS20</td><td><div class="pname">온담 하루견과 20봉</div><div class="psub">20g x 20봉</div></td><td class="r num">430</td><td class="c num">×20</td><td class="r num">8,600</td><td class="r num">19,900</td><td class="r num">16,900</td><td class="r num">14,900</td><td class="r num pos">28.71%</td><td class="r num pos">18.36%</td><td class="r num pos">9.15%</td></tr><tr><td class="num psub">PROTEIN30</td><td><div class="pname">온담 프로틴 쉐이크 30포</div><div class="psub">30g x 30포</div></td><td class="r num">480</td><td class="c num">×30</td><td class="r num">14,400</td><td class="r num">32,900</td><td class="r num">27,900</td><td class="r num">23,900</td><td class="r num pos">34.11%</td><td class="r num pos">24.63%</td><td class="r num pos">14.20%</td></tr><tr><td class="num psub">PROBIO30</td><td><div class="pname">온담 생유산균 30포</div><div class="psub">2g x 30포</div></td><td class="r num">320</td><td class="c num">×30</td><td class="r num">9,600</td><td class="r num">29,900</td><td class="r num">24,900</td><td class="r num">19,900</td><td class="r num pos">44.86%</td><td class="r num pos">36.40%</td><td class="r num pos">23.68%</td></tr><tr><td class="num psub">VITD90</td><td><div class="pname">온담 비타민D 3000IU 90정</div><div class="psub">90정 (3개월분)</div></td><td class="r num">55</td><td class="c num">×90</td><td class="r num">4,950</td><td class="r num">16,900</td><td class="r num">13,900</td><td class="r num">10,900</td><td class="r num pos">39.96%</td><td class="r num pos">29.81%</td><td class="r num pos">14.06%</td></tr><tr><td class="num psub">MILKT90</td><td><div class="pname">온담 밀크씨슬 90정</div><div class="psub">90정 (3개월분)</div></td><td class="r num">78</td><td class="c num">×90</td><td class="r num">7,020</td><td class="r num">19,900</td><td class="r num">15,900</td><td class="r num">12,900</td><td class="r num pos">36.65%</td><td class="r num pos">23.98%</td><td class="r num pos">9.33%</td></tr><tr><td class="num psub">OMEGA60</td><td><div class="pname">온담 알티지 오메가3 60캡슐</div><div class="psub">60캡슐 (2개월분)</div></td><td class="r num">145</td><td class="c num">×60</td><td class="r num">8,700</td><td class="r num">22,900</td><td class="r num">18,900</td><td class="r num">14,900</td><td class="r num pos">35.91%</td><td class="r num pos">25.10%</td><td class="r num pos">8.48%</td></tr><tr class="tr-neg"><td class="num psub">LITTER2</td><td><div class="pname">온담 벤토나이트 고양이모래 10L 2개</div><div class="psub">10L x 2개</div></td><td class="r num">6,400</td><td class="c num">×2</td><td class="r num">12,800</td><td class="r num">24,900</td><td class="r num">20,900</td><td class="r num">17,900</td><td class="r num pos">23.55%</td><td class="r num pos">11.40%</td><td class="r num neg">-1.27%</td></tr><tr><td class="num psub">PETSNACK50</td><td><div class="pname">온담 강아지 수제 간식스틱 50개</div><div class="psub">10g x 50개</div></td><td class="r num">320</td><td class="c num">×50</td><td class="r num">16,000</td><td class="r num">29,900</td><td class="r num">24,900</td><td class="r num">21,900</td><td class="r num pos">23.45%</td><td class="r num pos">10.69%</td><td class="r num warn">0.24%</td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <div class="card-hd"><h2>컬럼이 뜻하는 것</h2></div>
+    <div class="card-bd">
+      <dl class="kv" style="grid-template-columns:120px 1fr">
+        <dt>매입가</dt><dd style="text-align:left">제품 <b>1개당</b> 원가. 세트 원가가 아닙니다.</dd>
+        <dt>구성수량</dt><dd style="text-align:left">한 번 팔 때 나가는 개수.
+          <b>원가 = 매입가 × 구성수량</b></dd>
+        <dt>가격 3단계</dt><dd style="text-align:left">같은 제품을 파는 세 가격.
+          정상가 → 일반행사가 → 특가 순으로 마진이 깎입니다.</dd>
+        <dt>마진 열</dt><dd style="text-align:left">수수료 13% 고정 가정으로 계산한 <b>계획값</b>입니다.
+          실제 채널 요율을 넣으면 달라집니다 — 그게 채널 DB의 역할입니다.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="mock-note">
+    <b>화면 기획(Mock)입니다.</b> 숫자는 목업 데이터에서 뽑은 실제 계산 결과이며,
+    회사·브랜드·제품·채널은 전부 가상입니다. 실존 기업과 무관합니다.
+    재생성: <code>python mock/generate.py</code>
+  </div>
+</main>
+</div>
+</body>
+</html>

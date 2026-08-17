@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}온담식품 수익률{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+{% block style %}{% endblock %}
+</head>
+<body>
+<div class="shell">
+
+<aside class="side">
+  <div class="brand">
+    <div class="brand-mark">디</div>
+    <div><div class="brand-name">온담식품 수익률</div><div class="brand-sub">온라인몰 손익 관리</div></div>
+  </div>
+  <div class="nav">
+    <div class="nav-label">데이터 입력</div>
+    <a href="/upload" class="{{ 'on' if nav=='upload' }}"><span class="ic">📥</span> 매출 업로드</a>
+    <a href="/mapping" class="{{ 'on' if nav=='mapping' }}"><span class="ic">🔗</span> 상품명 매핑
+      {% if unmapped_badge %}<span class="badge">{{ unmapped_badge }}</span>{% endif %}</a>
+    <div class="nav-label">분석</div>
+    <a href="/" class="{{ 'on' if nav=='dashboard' }}"><span class="ic">📊</span> 수익률 대시보드</a>
+    <a href="/deals" class="{{ 'on' if nav=='deals' }}"><span class="ic">🏷</span> 제품·딜별 수익률</a>
+    <div class="nav-label">마스터</div>
+    <a href="/products" class="{{ 'on' if nav=='products' }}"><span class="ic">📦</span> 제품 DB</a>
+    <a href="/channels" class="{{ 'on' if nav=='channels' }}"><span class="ic">🛒</span> 채널 관리</a>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div>
+      <h1>{% block h1 %}{% endblock %}</h1>
+      <div class="sub">{% block sub %}{% endblock %}</div>
+    </div>
+    <div class="right">{% block actions %}{% endblock %}</div>
+  </div>
+
+  {% block content %}{% endblock %}
+
+  {% if demo_notice %}
+  <div class="mock-note">
+    <b>데모 데이터입니다.</b> 매입가·판매가·채널 수수료율은 실제 값이고 판매 수량만 가상입니다.
+    실물 채널 파일이 들어오면 이 배치를 교체합니다. 재생성: <code>python -m app.demo</code>
+  </div>
+  {% endif %}
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# 웹
+fastapi==0.141.1
+uvicorn==0.52.3
+jinja2==3.1.6
+python-multipart==0.0.32
+
+# 데이터
+SQLAlchemy==2.0.52
+openpyxl==3.1.5
+RapidFuzz==3.14.5
+
+# 수집함 진단(구 포맷 .xls 읽기)
+pandas==3.0.5
+xlrd==2.0.2
+
+# 테스트
+pytest==9.1.1

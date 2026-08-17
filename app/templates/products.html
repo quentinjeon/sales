@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}제품 DB · 온담식품 수익률{% endblock %}
+{% block h1 %}제품 DB{% endblock %}
+{% block sub %}모든 손익 계산의 원천. 매입가 · 구성수량 · 가격 티어를 여기서 관리합니다.{% endblock %}
+{% block style %}<style>
+.tier{text-align:right;font-variant-numeric:tabular-nums}
+.tier .p{font-size:12.5px}.tier .m{font-size:11.5px;font-weight:650}
+.mpos{color:var(--pos)}.mwarn{color:var(--warn)}.mneg{color:var(--neg)}
+th.grp{text-align:center;font-size:10.5px;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+</style>{% endblock %}
+{% block content %}
+<div class="banner warn"><div class="bi">⚠</div><div>
+  <div class="bt">가격표의 수수료 13% 고정 가정을 채널별 실측 요율로 교체했습니다</div>
+  <div class="bd"><b>계획 마진율</b>은 원본 가격표대로 13% 기준이고, <b>실적</b>은 실제 판매된 채널의 요율
+    (한빛홈쇼핑 9.5% / 스위프트 11.0% / 오픈마켓 13.0%)로 계산한 값입니다.</div></div></div>
+
+<div class="card">
+  <div class="card-hd"><h2>제품 목록</h2><span class="note">{{ rows|length }}개 · 특가 계획 마진율 낮은 순</span>
+    <div class="right"><span class="tag">원천: 온담식품_제품별가격표.xlsx</span></div></div>
+  <div class="tw"><table class="t">
+    <thead>
+      <tr><th rowspan="2" style="vertical-align:bottom">제품</th>
+        <th rowspan="2" class="r" style="vertical-align:bottom">매입가</th>
+        <th rowspan="2" class="c" style="vertical-align:bottom">구성</th>
+        <th colspan="3" class="grp">계획 마진율 <span style="font-weight:400;text-transform:none">(수수료 13% 가정)</span></th>
+        <th colspan="3" class="grp" style="border-left:1px solid var(--border)">{{ period }} 실적</th></tr>
+      <tr><th class="r">정상가</th><th class="r">일반행사</th><th class="r">특가</th>
+        <th class="r" style="border-left:1px solid var(--border)">판매</th><th class="r">기여이익</th><th class="r">마진율</th></tr>
+    </thead>
+    <tbody>{% for r in rows %}
+      <tr class="{{ 'tr-neg' if r.plan[2] is not none and r.plan[2]<0 else ('tr-warn' if r.plan[2] is not none and r.plan[2]<0.05 else '') }}">
+        <td><span class="pname">{{ r.name }}</span><br><span class="psub">{{ r.spec }}</span></td>
+        <td class="r num">{{ r.cost|comma }}</td><td class="c"><span class="tag">×{{ r.pack }}</span></td>
+        {% for i in range(3) %}
+        <td class="tier"><div class="p num">{{ r.prices[i]|comma }}</div>
+          <div class="m {{ mcls(r.plan[i]) }}">{{ r.plan[i]|pct2 }}</div></td>
+        {% endfor %}
+        <td class="r num" style="border-left:1px solid var(--border)">{{ r.qty|comma if r.qty else '—' }}</td>
+        <td class="r num" style="font-weight:650{% if r.profit and r.profit<0 %};color:var(--neg){% endif %}">{{ r.profit|comma if r.qty else '—' }}</td>
+        <td class="r num {{ mcls(r.margin) }}" style="font-weight:650">{{ r.margin|pct2 if r.qty else '—' }}</td>
+      </tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+{% if unresolved %}
+<div class="card" style="margin-top:16px">
+  <div class="card-hd"><h2>정리가 필요한 항목</h2><span class="note">원본 가격표에 상품명 없이 규격만 있던 행</span></div>
+  <div class="card-bd"><div class="psub" style="line-height:1.8">
+    {% for spec, cost in unresolved %}<span class="tag mut" style="margin:0 6px 6px 0">{{ spec }} · 매입가 {{ cost|comma }}</span>{% endfor %}
+    <br>제품명 확정 후 등록하거나 명시적으로 제외 처리해야 매핑이 가능합니다.</div></div>
+</div>
+{% endif %}
+{% endblock %}

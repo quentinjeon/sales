@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}채널 관리 · 온담식품 수익률{% endblock %}
+{% block h1 %}채널 관리{% endblock %}
+{% block sub %}채널 추가는 <b>행 하나 등록</b>으로 끝납니다. 계산 로직은 건드리지 않습니다.{% endblock %}
+{% block style %}<style>
+.cov{display:flex;height:30px;border-radius:7px;overflow:hidden;border:1px solid var(--border)}
+.cov div{display:grid;place-items:center;font-size:11px;font-weight:650;color:#fff;white-space:nowrap;overflow:hidden}
+.row-wait td{opacity:.72}
+</style>{% endblock %}
+{% block content %}
+<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+  <div class="kpi"><div class="k">활성 채널</div><div class="v num">{{ active|length }}<span class="u">개</span></div>
+    <div class="d">전체 {{ active|length + waiting|length }}개 중</div></div>
+  <div class="kpi"><div class="k">커버 매출 비중</div><div class="v num">{{ cover_pct }}<span class="u">%</span></div>
+    <div class="d">4~5월 실적 기준</div></div>
+  <div class="kpi"><div class="k">대기 채널</div><div class="v num">{{ waiting|length }}<span class="u">개</span></div>
+    <div class="d">등록만 되어 있음</div></div>
+  <div class="kpi"><div class="k">수수료율 범위</div><div class="v num">{{ fee_min }}~{{ fee_max }}<span class="u">%</span></div>
+    <div class="d">실측 기준</div></div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h2>채널 커버리지</h2><span class="note">2026년 4~5월 실적 매출 88,401,721원 기준</span></div>
+  <div class="card-bd">
+    <div class="cov">{% for s in coverage %}
+      <div style="width:{{ s.pct }}%;background:{{ s.color }}{% if s.muted %};color:var(--text-3){% endif %}">
+        {% if s.pct > 7 %}{{ s.name }} {{ s.pct }}%{% endif %}</div>{% endfor %}</div>
+    <div class="psub" style="margin-top:11px;line-height:1.65">
+      상위 {{ active|length }}개 채널이 <b>매출의 {{ cover_pct }}%</b>를 차지합니다.
+      나머지 {{ waiting|length }}개를 다 붙여도 {{ 100 - cover_pct }}%가 늘어날 뿐이라, 먼저 활성 채널을 정확히 만들고 매출 순으로 확장합니다.</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h2>활성 채널</h2><span class="note">{{ active|length }}개</span></div>
+  <div class="tw"><table class="t">
+    <thead><tr><th>채널</th><th>그룹</th><th class="c">수수료율</th><th class="c">수수료 기준</th>
+      <th class="c">배송 주체</th><th class="c">물류비</th><th class="c">정산 기준일</th><th class="c">상태</th></tr></thead>
+    <tbody>{% for c in active %}<tr>
+      <td><span class="pname">{{ c.name }}</span></td><td class="psub nw">{{ c.group_name }}</td>
+      <td class="c num" style="font-weight:650">{{ c.fee_rate|pct1 }}</td>
+      <td class="c psub">{{ fee_base_ko(c.fee_base) }}</td><td class="c psub">{{ ship_ko(c.ship_owner) }}</td>
+      <td class="c num">{% if c.logi_amount %}{{ c.logi_amount|comma }}{% if c.logi_est %} <span class="psub">추정</span>{% endif %}{% else %}채널 부담{% endif %}</td>
+      <td class="c psub">{{ settle_ko(c.settle_date_src) }}</td>
+      <td class="c"><span class="tag {{ 'warn' if c.logi_est else 'pos' }}"><span class="dot"></span>{{ '물류비 추정' if c.logi_est else '활성' }}</span></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="card-hd"><h2>대기 채널</h2><span class="note">등록만 되어 있고 계산에는 미포함 · 확장 순서대로</span>
+    <div class="right"><span class="tag mut">활성화 = 상태 변경 하나</span></div></div>
+  <div class="tw"><table class="t">
+    <thead><tr><th class="c">순서</th><th>채널</th><th>그룹</th><th class="r">4~5월 매출</th><th class="r">비중</th>
+      <th class="c">수수료율</th><th>확인 필요 사항</th></tr></thead>
+    <tbody>{% for c in waiting %}<tr class="row-wait">
+      <td class="c"><span class="tag {{ 'acc' if loop.index<=3 else '' }}">{{ loop.index }}</span></td>
+      <td><span class="pname">{{ c.name }}</span></td><td class="psub nw">{{ c.group_name }}</td>
+      <td class="r num">{{ c.revenue|comma }}</td><td class="r num">{{ c.share }}%</td>
+      <td class="c num">{{ c.fee_rate|pct1 if c.fee_rate else '미확인' }}</td>
+      <td class="psub">{{ c.note }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr><td></td><td>대기 {{ waiting|length }}개 합계</td><td></td>
+      <td class="r num">{{ waiting_sum|comma }}</td><td class="r num">{{ 100 - cover_pct }}%</td>
+      <td colspan="2"></td></tr></tfoot>
+  </table></div>
+</div>
+{% endblock %}

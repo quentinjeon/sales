@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}매출 업로드 · 온담식품 수익률{% endblock %}
+{% block h1 %}매출 업로드{% endblock %}
+{% block sub %}채널에서 받은 엑셀을 올리면 제품 DB의 원가·구성과 채널 수수료율로 손익이 자동 계산됩니다.{% endblock %}
+{% block style %}<style>
+.drop{border:2px dashed var(--border-2);border-radius:12px;padding:30px 20px;text-align:center;background:var(--surface-2)}
+.drop .ic{font-size:30px;opacity:.5}.drop .t{font-weight:650;margin:8px 0 3px;font-size:14.5px}
+.drop .d{color:var(--text-3);font-size:12.5px}
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:10px;margin-bottom:18px}
+.flow .box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;box-shadow:var(--shadow)}
+.flow .box .st{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--text-3);margin-bottom:5px}
+.flow .box .ti{font-weight:650;font-size:13.5px;margin-bottom:3px}
+.flow .box .de{font-size:11.5px;color:var(--text-3);line-height:1.45}
+.flow .ar{align-self:center;color:var(--text-3);font-size:16px}
+@media(max-width:1080px){.flow{grid-template-columns:1fr}.flow .ar{display:none}}
+.calc{font-size:12.5px;line-height:2.1}
+.calc .row{display:flex;gap:10px;align-items:baseline}
+.calc .op{width:14px;color:var(--text-3);text-align:center;flex:0 0 14px}
+.calc .lb{flex:1}.calc .am{font-weight:600;font-variant-numeric:tabular-nums}
+.calc .src{font-size:11px;color:var(--text-3)}
+.calc .ln{border-top:1px solid var(--border-2);margin:6px 0}
+</style>{% endblock %}
+{% block content %}
+{% if ok %}<div class="banner pos"><div class="bi">✓</div>
+  <div><div class="bt">업로드 완료</div><div class="bd">{{ ok }}</div></div></div>{% endif %}
+{% if error %}<div class="banner neg"><div class="bi">✗</div>
+  <div><div class="bt">업로드 실패 — 파일을 확인해 주세요</div><div class="bd">{{ error }}</div></div></div>{% endif %}
+<div class="flow">
+  <div class="box hi" style="border-color:var(--accent);background:var(--accent-bg)">
+    <div class="st" style="color:var(--accent)">STEP 1</div><div class="ti" style="color:var(--accent)">엑셀 업로드</div>
+    <div class="de">채널별 시트가 든<br>주문건별 상세 파일</div></div>
+  <div class="ar">→</div>
+  <div class="box"><div class="st">STEP 2</div><div class="ti">표준화 · 매핑</div>
+    <div class="de">채널 상품명/옵션을<br>제품 DB의 딜에 연결</div></div>
+  <div class="ar">→</div>
+  <div class="box"><div class="st">STEP 3</div><div class="ti">손익 자동 계산</div>
+    <div class="de">매입가 × 구성수량,<br>채널 수수료율, 물류비</div></div>
+  <div class="ar">→</div>
+  <div class="box"><div class="st">STEP 4</div><div class="ti">월별 · 주별 조회</div>
+    <div class="de">채널 · 제품 · 딜별<br>이익과 마진율</div></div>
+</div>
+
+<div class="banner {{ 'pos' if q.unmapped_count==0 else 'warn' }}">
+  <div class="bi">{{ '✓' if q.unmapped_count==0 else '⚠' }}</div>
+  <div><div class="bt">{{ period }} 처리 완료 — {{ files|length }}개 채널 / {{ t.orders|comma }}건 / 매출 {{ t.revenue|comma }}원</div>
+    <div class="bd">{% if q.unmapped_count %}미매핑 <b>{{ q.unmapped_count }}건({{ q.unmapped_amount|comma }}원)</b>은 계산에서 제외되어 있습니다.{% else %}모든 주문이 매핑되어 있습니다.{% endif %}</div></div>
+  {% if q.unmapped_count %}<div class="right"><a href="/mapping" class="btn btn-sm">미매핑 처리 →</a></div>{% endif %}
+</div>
+
+<div class="g-2-1">
+  <div class="stack">
+    <div class="card">
+      <div class="card-hd"><h2>파일 업로드</h2><span class="note">채널당 1개 · .xls / .xlsx / .csv</span></div>
+      <div class="card-bd">
+        <form method="post" action="/upload" enctype="multipart/form-data">
+          <div class="drop" style="padding:20px">
+            <div class="ic">⬆</div>
+            <div class="t">매출 엑셀을 선택하세요 <span class="tag neg">필수</span></div>
+            <div class="d">채널별 시트가 들어 있는 파일 1개 · 시트명이 채널명과 같아야 합니다</div>
+            <div style="margin-top:12px">
+              <input class="inp" type="file" name="sales" accept=".xlsx,.xlsm" required
+                     style="max-width:420px;margin:0 auto"></div>
+          </div>
+          <div class="g2" style="margin-top:14px">
+            <div class="field"><label>상품정보 엑셀 <span class="psub">(처음 한 번만)</span></label>
+              <input class="inp" type="file" name="products" accept=".xlsx,.xlsm">
+              <div class="hint">제품코드·매입가·구성수량·가격 3단계</div></div>
+            <div class="field"><label>채널정보 엑셀 <span class="psub">(처음 한 번만)</span></label>
+              <input class="inp" type="file" name="channels" accept=".xlsx,.xlsm">
+              <div class="hint">채널코드·수수료율·물류비·배송주체</div></div>
+          </div>
+          <div class="field"><label>기간 <span class="psub">(비우면 주문일에서 자동 판별)</span></label>
+            <input class="inp" type="text" name="period" placeholder="2026-07"
+                   pattern="[0-9]{4}-[0-9]{2}" style="max-width:200px"></div>
+          <button class="btn btn-pri" type="submit">업로드 → 매핑 → 손익 계산</button>
+          <span class="psub" style="margin-left:10px">미매핑은 버리지 않고 큐에 남깁니다</span>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>{{ period }} 업로드 현황</h2>
+        <div class="right"><span class="tag pos"><span class="dot"></span>{{ files|length }} 완료</span>
+          <span class="tag mut">{{ waiting_count }} 미수집</span></div></div>
+      <div class="tw"><table class="t">
+        <thead><tr><th>채널</th><th>파일</th><th class="r">주문건</th><th class="r">매출</th>
+          <th class="c">매핑</th><th class="c">상태</th></tr></thead>
+        <tbody>{% for f in files %}<tr>
+          <td><span class="pname">{{ f.channel_name }}</span></td><td class="psub">{{ f.filename }}</td>
+          <td class="r num">{{ f.row_count|comma }}</td><td class="r num">{{ f.gross_sum|comma }}</td>
+          <td class="c"><span class="tag {{ 'pos' if f.rate>=0.999 else 'warn' }}">{{ f.rate|pct0 }}</span></td>
+          <td class="c"><span class="tag {{ 'pos' if f.rate>=0.999 else 'warn' }}"><span class="dot"></span>{{ '계산완료' if f.rate>=0.999 else '매핑 %d건'|format(f.unmapped) }}</span></td>
+        </tr>{% endfor %}</tbody>
+        <tfoot><tr><td>합계</td><td></td><td class="r num">{{ t.orders|comma }}</td>
+          <td class="r num">{{ t.revenue|comma }}</td>
+          <td class="c"><span class="tag {{ 'pos' if q.mapping_rate>=0.999 else 'warn' }}">{{ q.mapping_rate|pct1 }}</span></td><td></td></tr></tfoot>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-hd"><h2>{{ period }} 손익 구조</h2></div>
+      <div class="card-bd"><div class="calc">
+        <div class="row"><span class="op"></span><span class="lb">매출 <span class="src">업로드 원장</span></span><span class="am">{{ t.revenue|comma }}</span></div>
+        <div class="row"><span class="op">−</span><span class="lb">채널 수수료 <span class="src">채널 DB</span></span><span class="am">{{ t.fee|comma }}</span></div>
+        <div class="row"><span class="op">−</span><span class="lb">상품 원가 <span class="src">제품 DB</span></span><span class="am">{{ t.cogs|comma }}</span></div>
+        <div class="row"><span class="op">−</span><span class="lb">물류비 <span class="src">채널 DB</span></span><span class="am">{{ t.logistics|comma }}</span></div>
+        <div class="ln"></div>
+        <div class="row" style="font-weight:700"><span class="op">=</span><span class="lb">기여이익</span><span class="am">{{ t.profit|comma }}</span></div>
+        <div class="row"><span class="op"></span><span class="lb psub">마진율</span><span class="am" style="color:var(--pos)">{{ t.margin|pct2 }}</span></div>
+      </div>
+      <div class="psub" style="margin-top:12px;line-height:1.6;padding-top:11px;border-top:1px dashed var(--border-2)">
+        ⚠ 반품·취소, 쿠폰 자사부담, 광고비는 아직 반영 전입니다 (P1).</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>채널별 받을 파일</h2></div>
+      <div class="card-bd" style="padding-top:6px;padding-bottom:6px">
+        {% for s in guide %}
+        <div class="step {{ 'done' if s.done else 'now' }}"><div class="n">{{ '✓' if s.done else loop.index }}</div>
+          <div class="body"><div class="ti">{{ s.name }}</div><div class="de">{{ s.path }}</div></div></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

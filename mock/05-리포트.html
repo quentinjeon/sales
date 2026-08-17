@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>상세 리포트 · 온담식품 수익률 관리</title>
+<style data-src="assets/app.css">
+/* ── 온담식품 온라인 수익률 대시보드 · Mock UI ───────────────────────── */
+
+:root {
+  --bg:        #f7f8fa;
+  --surface:   #ffffff;
+  --surface-2: #f2f4f7;
+  --border:    #e3e6ec;
+  --border-2:  #d3d8e0;
+  --text:      #171b23;
+  --text-2:    #5b6373;
+  --text-3:    #8b93a3;
+  --accent:    #3b5bdb;
+  --accent-bg: #edf0fd;
+  --pos:       #0f8a5f;
+  --pos-bg:    #e6f6ef;
+  --warn:      #b0730a;
+  --warn-bg:   #fdf3e0;
+  --neg:       #c8382f;
+  --neg-bg:    #fdeceb;
+  --grid:      #eceff4;
+  --shadow:    0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.04);
+  --radius:    10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:        #0e1116;
+    --surface:   #161a21;
+    --surface-2: #1d222b;
+    --border:    #262c36;
+    --border-2:  #343b47;
+    --text:      #e7eaef;
+    --text-2:    #9aa3b2;
+    --text-3:    #6b7484;
+    --accent:    #7b93f5;
+    --accent-bg: #1b2340;
+    --pos:       #46c78f;
+    --pos-bg:    #10281f;
+    --warn:      #e0a23c;
+    --warn-bg:   #2b2114;
+    --neg:       #f0736a;
+    --neg-bg:    #2e1715;
+    --grid:      #222833;
+    --shadow:    0 1px 2px rgba(0,0,0,.3);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:        #0e1116;
+  --surface:   #161a21;
+  --surface-2: #1d222b;
+  --border:    #262c36;
+  --border-2:  #343b47;
+  --text:      #e7eaef;
+  --text-2:    #9aa3b2;
+  --text-3:    #6b7484;
+  --accent:    #7b93f5;
+  --accent-bg: #1b2340;
+  --pos:       #46c78f;
+  --pos-bg:    #10281f;
+  --warn:      #e0a23c;
+  --warn-bg:   #2b2114;
+  --neg:       #f0736a;
+  --neg-bg:    #2e1715;
+  --grid:      #222833;
+  --shadow:    0 1px 2px rgba(0,0,0,.3);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Pretendard,
+               "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ── 레이아웃 ───────────────────────────────────────────────────────── */
+.shell {
+  display: flex; min-height: 100vh;
+  /* 사이드바는 sticky 라 높이가 뷰포트에 묶인다. 좌측 띠를 배경으로 깔아
+     문서가 길어져도 빈 곳이 생기지 않게 한다. */
+  background: linear-gradient(to right, var(--surface) 0 226px, var(--bg) 226px);
+}
+
+.side {
+  width: 226px; flex: 0 0 226px;
+  border-right: 1px solid var(--border);
+  padding: 18px 12px;
+  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+}
+.brand { display: flex; align-items: center; gap: 9px; padding: 0 8px 16px; }
+.brand-mark {
+  width: 26px; height: 26px; border-radius: 7px; flex: 0 0 26px;
+  background: linear-gradient(135deg, var(--accent), #7048e8);
+  display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700;
+}
+.brand-name { font-weight: 650; font-size: 14px; letter-spacing: -.01em; }
+.brand-sub  { font-size: 11px; color: var(--text-3); margin-top: -2px; }
+
+.nav-label {
+  font-size: 10.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text-3); padding: 14px 10px 6px;
+}
+.nav a {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; border-radius: 7px; margin-bottom: 1px;
+  color: var(--text-2); text-decoration: none; font-size: 13.5px;
+}
+.nav a:hover { background: var(--surface-2); color: var(--text); }
+.nav a.on { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.nav a .ic { width: 16px; text-align: center; font-size: 13px; opacity: .9; }
+.nav a .badge {
+  margin-left: auto; background: var(--neg); color: #fff;
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 9px;
+}
+
+.main { flex: 1; min-width: 0; padding: 22px 28px 60px; max-width: 1440px; }
+
+.topbar { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.topbar h1 { font-size: 21px; font-weight: 650; margin: 0 0 3px; letter-spacing: -.02em; }
+.topbar .sub { color: var(--text-2); font-size: 13px; }
+.topbar .right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* ── 기본 요소 ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.card-hd {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.card-hd h2 { font-size: 14px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+.card-hd .note { font-size: 12px; color: var(--text-3); }
+.card-hd .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.card-bd { padding: 16px; }
+
+.btn {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { background: var(--surface-2); }
+.btn-pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn-pri:hover { filter: brightness(1.08); background: var(--accent); }
+.btn-sm { padding: 3px 9px; font-size: 12px; }
+
+.sel {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 7px;
+}
+.inp {
+  border: 1px solid var(--border-2); background: var(--surface); color: var(--text);
+  font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 7px; width: 100%;
+}
+
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  background: var(--surface-2); color: var(--text-2); white-space: nowrap;
+}
+.tag.pos  { background: var(--pos-bg);  color: var(--pos); }
+.tag.warn { background: var(--warn-bg); color: var(--warn); }
+.tag.neg  { background: var(--neg-bg);  color: var(--neg); }
+.tag.acc  { background: var(--accent-bg); color: var(--accent); }
+.tag.mut  { background: transparent; color: var(--text-3); border: 1px dashed var(--border-2); }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 6px; }
+
+/* ── KPI ────────────────────────────────────────────────────────────── */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.kpi .k { font-size: 12px; color: var(--text-2); margin-bottom: 7px; display: flex; align-items: center; gap: 5px; }
+.kpi .v { font-size: 25px; font-weight: 660; letter-spacing: -.03em; line-height: 1.15; }
+.kpi .v .u { font-size: 14px; font-weight: 500; color: var(--text-2); margin-left: 2px; }
+.kpi .d { font-size: 12px; margin-top: 6px; color: var(--text-3); display: flex; align-items: center; gap: 5px; }
+.kpi .d b { font-weight: 650; }
+.up   { color: var(--pos); }
+.down { color: var(--neg); }
+
+/* ── 테이블 ─────────────────────────────────────────────────────────── */
+.tw { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.t th {
+  text-align: left; font-weight: 600; font-size: 11.5px; color: var(--text-3);
+  letter-spacing: .03em; padding: 9px 12px; border-bottom: 1px solid var(--border);
+  background: var(--surface); white-space: nowrap; position: sticky; top: 0;
+}
+table.t td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+table.t tbody tr:last-child td { border-bottom: 0; }
+table.t tbody tr:hover { background: var(--surface-2); }
+table.t td.r, table.t td.c { white-space: nowrap; }
+table.t .pname { white-space: nowrap; }
+.nw { white-space: nowrap; }
+table.t .r { text-align: right; }
+table.t .c { text-align: center; }
+table.t tfoot td {
+  padding: 10px 12px; border-top: 1px solid var(--border-2); font-weight: 650;
+  background: var(--surface-2);
+}
+.tr-neg  { background: var(--neg-bg)  !important; }
+.tr-warn { background: var(--warn-bg) !important; }
+.pname { font-weight: 550; }
+.psub  { font-size: 11.5px; color: var(--text-3); }
+
+/* 마진율 인라인 바 */
+.mbar { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.mbar .track { width: 62px; height: 5px; border-radius: 3px; background: var(--grid); position: relative; overflow: hidden; flex: 0 0 62px; }
+.mbar .fill  { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.mbar .val   { min-width: 54px; text-align: right; font-weight: 600; }
+
+/* ── 폭포(이익 구조) ─────────────────────────────────────────────────── */
+.wf { display: flex; flex-direction: column; gap: 9px; }
+.wf-row { display: grid; grid-template-columns: 116px 1fr 120px; align-items: center; gap: 12px; font-size: 13px; }
+.wf-row .lbl { color: var(--text-2); }
+.wf-row .bar { height: 22px; background: var(--grid); border-radius: 5px; position: relative; }
+.wf-row .seg { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.wf-row .amt { text-align: right; font-weight: 600; }
+
+/* ── 히트맵 ─────────────────────────────────────────────────────────── */
+.hm { border-collapse: separate; border-spacing: 3px; font-size: 12px; }
+.hm th { font-weight: 600; color: var(--text-2); font-size: 11.5px; padding: 4px 6px; white-space: nowrap; }
+.hm th.rowh { text-align: left; max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
+.hm td { text-align: center; padding: 7px 4px; border-radius: 6px; font-weight: 650; min-width: 62px; font-variant-numeric: tabular-nums; }
+.hm td.na { background: var(--surface-2); color: var(--text-3); font-weight: 400; }
+
+/* ── 배너 ───────────────────────────────────────────────────────────── */
+.banner {
+  display: flex; gap: 12px; align-items: flex-start;
+  border-radius: var(--radius); padding: 13px 16px; margin-bottom: 16px; border: 1px solid;
+}
+.banner .bi { font-size: 16px; line-height: 1.3; }
+.banner .bt { font-weight: 650; margin-bottom: 3px; font-size: 13.5px; }
+.banner .bd { font-size: 13px; opacity: .92; }
+.banner .right { margin-left: auto; }
+.banner.neg  { background: var(--neg-bg);  border-color: color-mix(in srgb, var(--neg) 28%, transparent);  color: var(--neg); }
+.banner.warn { background: var(--warn-bg); border-color: color-mix(in srgb, var(--warn) 28%, transparent); color: var(--warn); }
+.banner.acc  { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 25%, transparent); color: var(--accent); }
+.banner.pos  { background: var(--pos-bg);  border-color: color-mix(in srgb, var(--pos) 25%, transparent);  color: var(--pos); }
+.banner .bd b { font-weight: 700; }
+
+/* ── 그리드 ─────────────────────────────────────────────────────────── */
+.g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.g3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.g-2-1 { display: grid; grid-template-columns: 1.65fr 1fr; gap: 16px; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 1080px) { .g2, .g3, .g-2-1 { grid-template-columns: 1fr; } }
+@media (max-width: 860px)  { .side { display: none; } .main { padding: 18px 16px 50px; } }
+
+/* ── 기타 ───────────────────────────────────────────────────────────── */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filters .lb { font-size: 12px; color: var(--text-3); margin-right: -2px; }
+
+.chip {
+  border: 1px solid var(--border-2); background: var(--surface); border-radius: 20px;
+  padding: 4px 11px; font-size: 12.5px; color: var(--text-2); cursor: pointer;
+}
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.field { margin-bottom: 13px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 5px; }
+.field .hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; font-size: 13px; }
+.kv dt { color: var(--text-2); }
+.kv dd { margin: 0; text-align: right; font-weight: 600; }
+
+.mock-note {
+  margin-top: 26px; padding: 12px 15px; border-radius: 9px;
+  border: 1px dashed var(--border-2); background: var(--surface);
+  font-size: 12.5px; color: var(--text-3); line-height: 1.65;
+}
+.mock-note b { color: var(--text-2); }
+
+.step { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--grid); }
+.step:last-child { border-bottom: 0; }
+.step .n {
+  width: 22px; height: 22px; flex: 0 0 22px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11.5px; font-weight: 700; background: var(--surface-2); color: var(--text-2);
+}
+.step.done .n { background: var(--pos); color: #fff; }
+.step.now  .n { background: var(--accent); color: #fff; }
+.step .body { flex: 1; min-width: 0; }
+.step .ti { font-weight: 600; font-size: 13.5px; margin-bottom: 2px; }
+.step .de { font-size: 12.5px; color: var(--text-3); }
+
+a.plain { color: var(--accent); text-decoration: none; }
+a.plain:hover { text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<div class="shell">
+<aside class="side">
+  <div class="brand">
+    <div class="brand-mark">온</div>
+    <div><div class="brand-name">온담식품 수익률</div><div class="brand-sub">온라인몰 손익 관리</div></div>
+  </div>
+  <div class="nav">
+    <div class="nav-label">안내</div>
+    <a href="index.html" class=""><span class="ic">🗂</span> 화면 목록</a>
+    <div class="nav-label">인풋</div>
+    <a href="01-상품DB.html" class=""><span class="ic">📦</span> 상품 DB</a>
+    <a href="02-채널DB.html" class=""><span class="ic">🛒</span> 채널 DB</a>
+    <a href="03-매출데이터.html" class=""><span class="ic">🧾</span> 매출 데이터</a>
+    <div class="nav-label">결과</div>
+    <a href="04-대시보드.html" class=""><span class="ic">📊</span> 수익률 대시보드</a>
+    <a href="05-리포트.html" class="on"><span class="ic">📈</span> 상세 리포트</a>
+  </div>
+</aside>
+<main class="main">
+  <div class="topbar">
+    <div><h1>상세 리포트</h1><div class="sub">2026-07 · 제품별 23종 · 채널×제품 31건</div></div>
+    <div class="right"><button class="btn btn-sm">엑셀 내보내기</button></div>
+  </div>
+
+  <div class="banner acc">
+    <div class="bi">🔍</div>
+    <div><div class="bt">같은 제품도 채널이 다르면 마진율이 달라집니다</div>
+    <div class="bd">아래 히트맵의 한 행을 가로로 읽어 보세요. 초록과 빨강이 같은 행에 있으면
+      <b>채널만 바꿔도 적자가 흑자가 된다</b>는 뜻입니다.</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd"><h2>채널 × 제품 마진율 히트맵</h2>
+      <span class="note">단위 % · 상위 14개 제품</span></div>
+    <div class="card-bd tw">
+      <table class="hm">
+        <thead><tr><th class="rowh">제품</th>
+          <th>한빛홈쇼핑</th><th>스위프트 풀필먼트</th><th>몰이십일</th><th>굿마켓</th><th>비드나우</th><th>전체</th></tr></thead>
+        <tbody><tr><th class="rowh">온담 생유산균 30포</th><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos)">39.9</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos);font-weight:700">39.9</td></tr><tr><th class="rowh">온담 프로틴 쉐이크 30포</th><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos)">27.4</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos);font-weight:700">27.4</td></tr><tr><th class="rowh">온담 알티지 오메가3 60캡슐</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos)">25.1</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 40%,transparent);color:var(--pos);font-weight:700">25.1</td></tr><tr><th class="rowh">온담 하루견과 20봉</th><td class="" style="background:color-mix(in srgb,var(--pos) 36%,transparent);color:var(--pos)">21.9</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 36%,transparent);color:var(--pos);font-weight:700">21.9</td></tr><tr><th class="rowh">온담 볶음 김자반 4개입</th><td class="" style="background:color-mix(in srgb,var(--pos) 35%,transparent);color:var(--pos)">20.7</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 35%,transparent);color:var(--pos);font-weight:700">20.7</td></tr><tr><th class="rowh">온담 지퍼백 대용량 3종</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 28%,transparent);color:var(--pos)">14.9</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 28%,transparent);color:var(--pos);font-weight:700">14.9</td></tr><tr><th class="rowh">온담 비타민D 3000IU 90정</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 27%,transparent);color:var(--pos)">14.1</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 27%,transparent);color:var(--pos);font-weight:700">14.1</td></tr><tr><th class="rowh">온담 곤약젤리 10팩</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 25%,transparent);color:var(--pos)">12.2</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 25%,transparent);color:var(--pos);font-weight:700">12.2</td></tr><tr><th class="rowh">온담 살코기 참치캔 150g 12개</th><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 24%,transparent);color:var(--pos)">11.6</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 24%,transparent);color:var(--pos);font-weight:700">11.6</td></tr><tr><th class="rowh">온담 간편 즉석국 15개입</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 22%,transparent);color:var(--pos)">9.7</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 22%,transparent);color:var(--pos);font-weight:700">9.7</td></tr><tr><th class="rowh">온담 종이컵 1000개입</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 21%,transparent);color:var(--pos)">9.4</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 21%,transparent);color:var(--pos);font-weight:700">9.4</td></tr><tr><th class="rowh">온담 밀크씨슬 90정</th><td class="na" style="">—</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 21%,transparent);color:var(--pos)">9.3</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 21%,transparent);color:var(--pos);font-weight:700">9.3</td></tr><tr><th class="rowh">온담 캡형 물티슈 100매 10팩</th><td class="" style="background:color-mix(in srgb,var(--pos) 23%,transparent);color:var(--pos)">10.6</td><td class="" style="background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)">4.8</td><td class="na" style="">—</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 19%,transparent);color:var(--pos)">7.1</td><td class="" style="background:color-mix(in srgb,var(--pos) 20%,transparent);color:var(--pos);font-weight:700">8.4</td></tr><tr><th class="rowh">온담 무균 즉석밥 210g 24개입</th><td class="" style="background:color-mix(in srgb,var(--pos) 24%,transparent);color:var(--pos)">11.5</td><td class="" style="background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)">4.5</td><td class="na" style="">—</td><td class="" style="background:color-mix(in srgb,var(--pos) 20%,transparent);color:var(--pos)">8.0</td><td class="" style="background:color-mix(in srgb,var(--pos) 20%,transparent);color:var(--pos)">8.0</td><td class="" style="background:color-mix(in srgb,var(--pos) 19%,transparent);color:var(--pos);font-weight:700">7.7</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-hd"><h2>제품별 리포트</h2>
+      <span class="note">기여이익 순 · 결과 엑셀 시트 02와 동일</span>
+      <div class="right"><span class="tag mut">23종</span></div></div>
+    <div class="tw"><table class="t">
+      <thead><tr><th>제품</th><th class="r">수량</th><th class="r">매출</th><th class="r">수수료</th>
+        <th class="r">원가</th><th class="r">물류비</th><th class="r">기여이익</th>
+        <th class="r">마진율</th></tr></thead>
+      <tbody><tr><td class="pname">온담 무균 즉석밥 210g 24개입</td><td class="r num">644</td><td class="r num">16,787,600</td><td class="r num">1,869,193</td><td class="r num">11,746,560</td><td class="r num">1,878,400</td><td class="r num pos" style="font-weight:650">1,293,447</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:22%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">7.70%</span></div></td></tr><tr><td class="pname">온담 생유산균 30포</td><td class="r num">81</td><td class="r num">2,016,900</td><td class="r num">191,646</td><td class="r num">777,600</td><td class="r num">243,000</td><td class="r num pos" style="font-weight:650">804,654</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:100%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">39.90%</span></div></td></tr><tr><td class="pname">온담 프로틴 쉐이크 30포</td><td class="r num">104</td><td class="r num">2,901,600</td><td class="r num">319,176</td><td class="r num">1,497,600</td><td class="r num">291,200</td><td class="r num pos" style="font-weight:650">793,624</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:78%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">27.35%</span></div></td></tr><tr><td class="pname">온담 3겹 데코 화장지 30롤</td><td class="r num">731</td><td class="r num">18,503,900</td><td class="r num">2,062,969</td><td class="r num">13,596,600</td><td class="r num">2,162,800</td><td class="r num warn" style="font-weight:650">681,531</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:11%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">3.68%</span></div></td></tr><tr><td class="pname">온담 캡형 물티슈 100매 10팩</td><td class="r num">425</td><td class="r num">6,198,500</td><td class="r num">647,681</td><td class="r num">3,782,500</td><td class="r num">1,248,200</td><td class="r num pos" style="font-weight:650">520,119</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:24%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">8.39%</span></div></td></tr><tr><td class="pname">온담 하루견과 20봉</td><td class="r num">116</td><td class="r num">1,960,400</td><td class="r num">186,296</td><td class="r num">997,600</td><td class="r num">348,000</td><td class="r num pos" style="font-weight:650">428,504</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:62%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">21.86%</span></div></td></tr><tr><td class="pname">온담 간편 즉석국 15개입</td><td class="r num">126</td><td class="r num">2,885,400</td><td class="r num">375,102</td><td class="r num">1,852,200</td><td class="r num">378,000</td><td class="r num pos" style="font-weight:650">280,098</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:28%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.71%</span></div></td></tr><tr><td class="pname">온담 볶음 김자반 4개입</td><td class="r num">70</td><td class="r num">1,043,000</td><td class="r num">99,120</td><td class="r num">518,000</td><td class="r num">210,000</td><td class="r num pos" style="font-weight:650">215,880</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:59%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">20.70%</span></div></td></tr><tr><td class="pname">온담 알티지 오메가3 60캡슐</td><td class="r num">42</td><td class="r num">793,800</td><td class="r num">103,194</td><td class="r num">365,400</td><td class="r num">126,000</td><td class="r num pos" style="font-weight:650">199,206</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:72%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">25.10%</span></div></td></tr><tr><td class="pname">온담 비타민D 3000IU 90정</td><td class="r num">105</td><td class="r num">1,144,500</td><td class="r num">148,785</td><td class="r num">519,750</td><td class="r num">315,000</td><td class="r num pos" style="font-weight:650">160,965</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:40%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">14.06%</span></div></td></tr><tr><td class="pname">온담 살코기 참치캔 150g 12개</td><td class="r num">63</td><td class="r num">1,379,700</td><td class="r num">151,767</td><td class="r num">892,080</td><td class="r num">176,400</td><td class="r num pos" style="font-weight:650">159,453</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:33%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">11.56%</span></div></td></tr><tr><td class="pname">온담 지퍼백 대용량 3종</td><td class="r num">81</td><td class="r num">1,044,900</td><td class="r num">135,837</td><td class="r num">510,300</td><td class="r num">243,000</td><td class="r num pos" style="font-weight:650">155,763</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:43%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">14.91%</span></div></td></tr><tr><td class="pname">온담 콜드브루 원액 6병</td><td class="r num">119</td><td class="r num">2,011,100</td><td class="r num">261,443</td><td class="r num">1,249,500</td><td class="r num">357,000</td><td class="r num pos" style="font-weight:650">143,157</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:20%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">7.12%</span></div></td></tr><tr><td class="pname">온담 곤약젤리 10팩</td><td class="r num">56</td><td class="r num">890,400</td><td class="r num">115,752</td><td class="r num">498,400</td><td class="r num">168,000</td><td class="r num pos" style="font-weight:650">108,248</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:35%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">12.16%</span></div></td></tr><tr><td class="pname">온담 종이컵 1000개입</td><td class="r num">52</td><td class="r num">1,138,800</td><td class="r num">148,044</td><td class="r num">728,000</td><td class="r num">156,000</td><td class="r num pos" style="font-weight:650">106,756</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:27%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.37%</span></div></td></tr><tr><td class="pname">온담 밀크씨슬 90정</td><td class="r num">73</td><td class="r num">941,700</td><td class="r num">122,421</td><td class="r num">512,460</td><td class="r num">219,000</td><td class="r num pos" style="font-weight:650">87,819</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:27%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.33%</span></div></td></tr><tr><td class="pname">온담 벤토나이트 고양이모래 10L 2개</td><td class="r num">99</td><td class="r num">1,772,100</td><td class="r num">194,931</td><td class="r num">1,267,200</td><td class="r num">277,200</td><td class="r num warn" style="font-weight:650">32,769</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:5%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">1.85%</span></div></td></tr><tr><td class="pname">온담 커피캡슐 100개입</td><td class="r num">143</td><td class="r num">3,846,700</td><td class="r num">423,137</td><td class="r num">3,003,000</td><td class="r num">400,400</td><td class="r num warn" style="font-weight:650">20,163</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.52%</span></div></td></tr><tr><td class="pname">온담 강아지 수제 간식스틱 50개</td><td class="r num">105</td><td class="r num">2,299,500</td><td class="r num">298,935</td><td class="r num">1,680,000</td><td class="r num">315,000</td><td class="r num warn" style="font-weight:650">5,565</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.24%</span></div></td></tr><tr><td class="pname">온담 주방세제 1L 3개</td><td class="r num">122</td><td class="r num">1,451,800</td><td class="r num">188,734</td><td class="r num">896,700</td><td class="r num">366,000</td><td class="r num warn" style="font-weight:650">366</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:0%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.03%</span></div></td></tr><tr class=tr-neg><td class="pname">온담 섬유유연제 2L 2개</td><td class="r num">85</td><td class="r num">1,011,500</td><td class="r num">131,495</td><td class="r num">663,000</td><td class="r num">255,000</td><td class="r num neg" style="font-weight:650">-37,995</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:11%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-3.76%</span></div></td></tr><tr class=tr-neg><td class="pname">온담 닭가슴살 100g 20팩</td><td class="r num">110</td><td class="r num">3,179,000</td><td class="r num">302,060</td><td class="r num">2,596,000</td><td class="r num">330,000</td><td class="r num neg" style="font-weight:650">-49,060</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:4%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-1.54%</span></div></td></tr><tr class=tr-neg><td class="pname">온담 얼큰라면 20개입 멀티팩</td><td class="r num">155</td><td class="r num">2,464,500</td><td class="r num">234,050</td><td class="r num">1,922,000</td><td class="r num">465,000</td><td class="r num neg" style="font-weight:650">-156,550</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:18%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-6.35%</span></div></td></tr></tbody>
+      <tfoot><tr><td>합계</td><td class="r num">3,707</td><td class="r num">77,667,300</td>
+        <td class="r num">8,711,768</td><td class="r num">52,072,450</td>
+        <td class="r num">10,928,600</td><td class="r num">5,954,482</td>
+        <td class="r num">7.67%</td></tr></tfoot>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h2>채널 × 제품 (딜) 리포트</h2>
+      <span class="note">마진율 낮은 순 · 결과 엑셀 시트 04와 동일</span>
+      <div class="right"><span class="tag mut">31건</span>
+        <span class="tag pos">채널 5곳</span></div></div>
+    <div class="tw"><table class="t">
+      <thead><tr><th>채널</th><th>제품(딜)</th><th class="r">판매가</th><th class="r">주문</th>
+        <th class="r">매출</th><th class="r">기여이익</th><th class="r">마진율</th></tr></thead>
+      <tbody><tr class=tr-neg><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 얼큰라면 20개입 멀티팩 ×20</td><td class="r num">15,900</td><td class="r num">155</td><td class="r num">2,464,500</td><td class="r num neg">-156,550</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:18%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-6.35%</span></div></td></tr><tr class=tr-neg><td class="psub nw">몰이십일</td><td class="pname">온담 섬유유연제 2L 2개 ×2</td><td class="r num">11,900</td><td class="r num">85</td><td class="r num">1,011,500</td><td class="r num neg">-37,995</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:11%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-3.76%</span></div></td></tr><tr class=tr-neg><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 닭가슴살 100g 20팩 ×20</td><td class="r num">28,900</td><td class="r num">110</td><td class="r num">3,179,000</td><td class="r num neg">-49,060</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:4%;background:var(--neg)"></div></div><span class="val" style="color:var(--neg)">-1.54%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 주방세제 1L 3개 ×3</td><td class="r num">11,900</td><td class="r num">122</td><td class="r num">1,451,800</td><td class="r num warn">366</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:0%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.03%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 강아지 수제 간식스틱 50개 ×50</td><td class="r num">21,900</td><td class="r num">105</td><td class="r num">2,299,500</td><td class="r num warn">5,565</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.24%</span></div></td></tr><tr><td class="psub nw">비드나우</td><td class="pname">온담 3겹 데코 화장지 30롤 ×30</td><td class="r num">24,900</td><td class="r num">44</td><td class="r num">1,095,600</td><td class="r num warn">2,772</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.25%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 3겹 데코 화장지 30롤 ×30</td><td class="r num">24,900</td><td class="r num">236</td><td class="r num">5,876,400</td><td class="r num warn">14,868</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.25%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 커피캡슐 100개입 ×100</td><td class="r num">26,900</td><td class="r num">143</td><td class="r num">3,846,700</td><td class="r num warn">20,163</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:1%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">0.52%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 벤토나이트 고양이모래 10L 2개 ×2</td><td class="r num">17,900</td><td class="r num">99</td><td class="r num">1,772,100</td><td class="r num warn">32,769</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:5%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">1.85%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 3겹 데코 화장지 30롤 ×30</td><td class="r num">24,900</td><td class="r num">300</td><td class="r num">7,470,000</td><td class="r num warn">280,200</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:11%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">3.75%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 무균 즉석밥 210g 24개입 ×24</td><td class="r num">24,900</td><td class="r num">268</td><td class="r num">6,673,200</td><td class="r num warn">300,428</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:13%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">4.50%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 캡형 물티슈 100매 10팩 ×10</td><td class="r num">13,900</td><td class="r num">134</td><td class="r num">1,862,600</td><td class="r num warn">89,914</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:14%;background:var(--warn)"></div></div><span class="val" style="color:var(--warn)">4.83%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 콜드브루 원액 6병 ×6</td><td class="r num">16,900</td><td class="r num">119</td><td class="r num">2,011,100</td><td class="r num pos">143,157</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:20%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">7.12%</span></div></td></tr><tr><td class="psub nw">비드나우</td><td class="pname">온담 캡형 물티슈 100매 10팩 ×10</td><td class="r num">14,900</td><td class="r num">59</td><td class="r num">879,100</td><td class="r num pos">62,717</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:20%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">7.13%</span></div></td></tr><tr><td class="psub nw">비드나우</td><td class="pname">온담 무균 즉석밥 210g 24개입 ×24</td><td class="r num">26,900</td><td class="r num">48</td><td class="r num">1,291,200</td><td class="r num pos">103,824</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:23%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">8.04%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 무균 즉석밥 210g 24개입 ×24</td><td class="r num">26,900</td><td class="r num">137</td><td class="r num">3,685,300</td><td class="r num pos">296,331</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:23%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">8.04%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 밀크씨슬 90정 ×90</td><td class="r num">12,900</td><td class="r num">73</td><td class="r num">941,700</td><td class="r num pos">87,819</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:27%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.33%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 종이컵 1000개입 ×1000</td><td class="r num">21,900</td><td class="r num">52</td><td class="r num">1,138,800</td><td class="r num pos">106,756</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:27%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.37%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 3겹 데코 화장지 30롤 ×30</td><td class="r num">26,900</td><td class="r num">151</td><td class="r num">4,061,900</td><td class="r num pos">383,691</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:27%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.45%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 간편 즉석국 15개입 ×15</td><td class="r num">22,900</td><td class="r num">126</td><td class="r num">2,885,400</td><td class="r num pos">280,098</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:28%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">9.71%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 캡형 물티슈 100매 10팩 ×10</td><td class="r num">14,900</td><td class="r num">232</td><td class="r num">3,456,800</td><td class="r num pos">367,488</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:30%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">10.63%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 무균 즉석밥 210g 24개입 ×24</td><td class="r num">26,900</td><td class="r num">191</td><td class="r num">5,137,900</td><td class="r num pos">592,864</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:33%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">11.54%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 살코기 참치캔 150g 12개 ×12</td><td class="r num">21,900</td><td class="r num">63</td><td class="r num">1,379,700</td><td class="r num pos">159,453</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:33%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">11.56%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 곤약젤리 10팩 ×10</td><td class="r num">15,900</td><td class="r num">56</td><td class="r num">890,400</td><td class="r num pos">108,248</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:35%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">12.16%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 비타민D 3000IU 90정 ×90</td><td class="r num">10,900</td><td class="r num">105</td><td class="r num">1,144,500</td><td class="r num pos">160,965</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:40%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">14.06%</span></div></td></tr><tr><td class="psub nw">굿마켓</td><td class="pname">온담 지퍼백 대용량 3종 ×3</td><td class="r num">12,900</td><td class="r num">81</td><td class="r num">1,044,900</td><td class="r num pos">155,763</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:43%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">14.91%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 볶음 김자반 4개입 ×4</td><td class="r num">14,900</td><td class="r num">70</td><td class="r num">1,043,000</td><td class="r num pos">215,880</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:59%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">20.70%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 하루견과 20봉 ×20</td><td class="r num">16,900</td><td class="r num">116</td><td class="r num">1,960,400</td><td class="r num pos">428,504</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:62%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">21.86%</span></div></td></tr><tr><td class="psub nw">몰이십일</td><td class="pname">온담 알티지 오메가3 60캡슐 ×60</td><td class="r num">18,900</td><td class="r num">42</td><td class="r num">793,800</td><td class="r num pos">199,206</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:72%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">25.10%</span></div></td></tr><tr><td class="psub nw">스위프트 풀필먼트</td><td class="pname">온담 프로틴 쉐이크 30포 ×30</td><td class="r num">27,900</td><td class="r num">104</td><td class="r num">2,901,600</td><td class="r num pos">793,624</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:78%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">27.35%</span></div></td></tr><tr><td class="psub nw">한빛홈쇼핑</td><td class="pname">온담 생유산균 30포 ×30</td><td class="r num">24,900</td><td class="r num">81</td><td class="r num">2,016,900</td><td class="r num pos">804,654</td><td class="r"><div class="mbar"><div class="track"><div class="fill" style="left:0;width:100%;background:var(--pos)"></div></div><span class="val" style="color:var(--pos)">39.90%</span></div></td></tr></tbody>
+    </table></div>
+  </div>
+
+  <div class="mock-note">
+    <b>화면 기획(Mock)입니다.</b> 숫자는 목업 데이터에서 뽑은 실제 계산 결과이며,
+    회사·브랜드·제품·채널은 전부 가상입니다. 실존 기업과 무관합니다.
+    재생성: <code>python mock/generate.py</code>
+  </div>
+</main>
+</div>
+</body>
+</html>

@@ -1,0 +1,150 @@
+# -*- coding: utf-8 -*-
+"""엑셀 적재 테스트 — PRD §4 · §9 검수 기준
+
+T-I1 이 가장 중요하다. 실습 엑셀 3장을 빈 DB에 넣었을 때
+PRD §9 의 검수 기준 숫자가 그대로 나와야 한다.
+어댑터·매핑·계산 중 하나라도 틀어지면 여기가 깨진다.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from app.models import Base, Channel, Deal, Sku
+from app.services import ingest as ing
+from app.services import report as rp
+
+DATA = Path(__file__).resolve().parent.parent / "docs" / "lecture" / "실습데이터"
+PERIOD = "2026-07"
+
+# PRD §9 검수 기준
+EXPECTED_TOTALS = {
+    "orders": 3707, "revenue": 77_667_300, "fee": 8_711_768,
+    "cogs": 52_072_450, "logistics": 10_928_600, "profit": 5_954_482,
+}
+EXPECTED_UNMAPPED = (7, 214_300)
+EXPECTED_CHANNELS = {                       # 채널코드 → (주문, 매출, 기여이익)
+    "HANBIT":   (1255, 26_728_500, 2_483_980),
+    "SWIFT_FF": (962, 22_497_800, 1_780_042),
+    "MALL21":   (769, 14_613_100, 868_547),
+    "GOODMKT":  (570, 10_562_000, 652_600),
+    "BIDNOW":   (151, 3_265_900, 169_313),
+}
+
+pytestmark = pytest.mark.skipif(
+    not (DATA / "01_상품정보.xlsx").exists(),
+    reason="실습 엑셀이 없습니다 — python docs/lecture/실습데이터_생성.py 로 생성하세요")
+
+
+@pytest.fixture(scope="module")
+def db():
+    """빈 DB에 엑셀 3장만 넣는다. 시드는 쓰지 않는다."""
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        ing.load_products(s, DATA / "01_상품정보.xlsx")
+        ing.load_channels(s, DATA / "02_채널정보.xlsx")
+        s.result = ing.load_sales(s, DATA / f"03_매출_{PERIOD}.xlsx", period=PERIOD)
+        yield s
+
+
+# ── T-I1 · 검수 기준 재현 ────────────────────────────────────────────────
+
+def test_i1_totals_match_prd(db):
+    """T-I1 — 엑셀만으로 PRD §9 의 전체 합계가 재현된다."""
+    t = rp.totals(db, PERIOD)
+    got = {"orders": t.orders, "revenue": t.revenue, "fee": t.fee,
+           "cogs": t.cogs, "logistics": t.logistics, "profit": t.profit}
+    assert got == EXPECTED_TOTALS
+
+
+def test_i1b_margin_rate(db):
+    assert rp.totals(db, PERIOD).margin == pytest.approx(0.0767, abs=1e-4)
+
+
+@pytest.mark.parametrize("cid,expected", EXPECTED_CHANNELS.items())
+def test_i1c_by_channel(db, cid, expected):
+    row = next(r for r in rp.by_channel(db, PERIOD) if r.key == cid)
+    assert (row.orders, row.revenue, row.profit) == expected
+
+
+# ── T-I2 · 마스터 적재 ───────────────────────────────────────────────────
+
+def test_i2_masters_loaded(db):
+    from sqlalchemy import func, select
+    assert db.scalar(select(func.count()).select_from(Sku)) == 23
+    assert db.scalar(select(func.count()).select_from(Deal)) == 69     # 23 × 3티어
+    assert db.scalar(select(func.count()).select_from(Channel)) == 14
+
+
+def test_i2b_pack_qty_survives_the_round_trip(db):
+    """구성수량이 딜 구성으로 살아있어야 한다 — 여기가 죽으면 원가가 수백 배 작아진다."""
+    deal = db.get(Deal, "CUP1000-X1000-NORMAL")
+    assert deal is not None
+    assert sum(c.qty for c in deal.components) == 1000
+
+
+# ── T-I3 · 미매핑은 버리지 않는다 ────────────────────────────────────────
+
+def test_i3_unmapped_is_kept(db):
+    q = rp.quality(db, PERIOD)
+    assert (q.unmapped_count, q.unmapped_amount) == EXPECTED_UNMAPPED
+
+
+def test_i3b_file_total_equals_mapped_plus_unmapped(db):
+    """파일 합계 = 대시보드 매출 + 미매핑. 이 항등식이 깨지면 매출이 새고 있다."""
+    t, q = rp.totals(db, PERIOD), rp.quality(db, PERIOD)
+    assert db.result.gross_sum == t.revenue + q.unmapped_amount
+
+
+# ── T-I4 · 채널별 컬럼명이 달라도 읽힌다 ─────────────────────────────────
+
+def test_i4_all_five_sheets_ingested(db):
+    assert db.result.files == 5
+    assert db.result.skipped_sheets == []
+    assert db.result.lines == 3714
+
+
+def test_i4b_actual_fee_wins_where_channel_provides_it(db):
+    """수수료 컬럼을 주는 채널은 실적값을, 안 주는 채널은 요율을 쓴다 (PRD §5-②)."""
+    from sqlalchemy import select
+    from app.models import SalesLine
+    src = {ch: db.scalar(select(SalesLine.fee_source)
+                         .where(SalesLine.channel_id == ch, SalesLine.map_status == "MAPPED"))
+           for ch in ("HANBIT", "MALL21", "SWIFT_FF", "GOODMKT", "BIDNOW")}
+    assert src["HANBIT"] == src["MALL21"] == "ACTUAL"
+    assert src["SWIFT_FF"] == src["GOODMKT"] == src["BIDNOW"] == "RATE"
+
+
+# ── T-I5 · 결과 엑셀 ─────────────────────────────────────────────────────
+
+def test_i5_export_has_six_sheets(db):
+    from app.services import export as ex
+    wb = ex.build(db, PERIOD)
+    assert wb.sheetnames == ["01_요약", "02_제품별", "03_채널별",
+                             "04_채널x제품", "05_적자딜", "06_미매핑"]
+    assert wb["05_적자딜"].max_row - 1 == 3        # 적자 딜 3건
+    assert wb["06_미매핑"].max_row - 1 == 3        # 미매핑 상품명 3종
+
+
+# ── T-I6 · 잘못된 파일은 조용히 넘어가지 않는다 ──────────────────────────
+
+def test_i6_missing_required_column_raises(tmp_path):
+    """필수 컬럼이 없으면 예외. 빈 값으로 채우면 매출이 증발한다."""
+    from openpyxl import Workbook
+    wb = Workbook()
+    wb.active.title = "한빛홈쇼핑"
+    wb.active.append(["주문번호", "주문일자", "상품명"])      # 수량·판매금액 없음
+    wb.active.append(["A1", "2026-07-01", "무언가"])
+    path = tmp_path / "bad.xlsx"
+    wb.save(path)
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as s:
+        ing.load_channels(s, DATA / "02_채널정보.xlsx")
+        with pytest.raises(ing.IngestError, match="필수 컬럼 누락"):
+            ing.load_sales(s, path, period=PERIOD)

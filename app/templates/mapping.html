@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}상품명 매핑 · 온담식품 수익률{% endblock %}
+{% block h1 %}상품명 매핑{% endblock %}
+{% block sub %}채널마다 상품명이 다릅니다. 이 연결이 안 되면 그 주문은 손익 계산에서 빠집니다.{% endblock %}
+{% block style %}<style>
+.map{display:grid;grid-template-columns:1fr 26px 1fr;gap:12px;align-items:center}
+.map .from{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px}
+.map .from .n{font-size:12.5px;font-weight:550;line-height:1.4}
+.map .from .o{font-size:11.5px;color:var(--text-3);margin-top:3px}
+.map .ar{text-align:center;color:var(--text-3);font-size:15px}
+.map .to{display:flex;flex-direction:column;gap:6px}
+.sug{border:1px solid var(--border-2);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px;background:var(--surface)}
+.sug .pct{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--pos)}
+.sug .pct.lo{color:var(--warn)}
+.item{border-bottom:1px solid var(--grid);padding:15px 0}.item:last-child{border-bottom:0}
+.item .hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12.5px;color:var(--text-3)}
+.gauge{height:8px;border-radius:5px;background:var(--grid);overflow:hidden}
+.gauge div{height:100%;background:var(--pos);border-radius:5px}
+</style>{% endblock %}
+{% block content %}
+<div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+  <div class="kpi"><div class="k">매핑률</div>
+    <div class="v num" style="color:var({{ '--pos' if q.mapping_rate>=0.999 else '--warn' }})">{{ q.mapping_rate|pct1 }}</div>
+    <div class="d">목표 99% 이상</div></div>
+  <div class="kpi"><div class="k">미매핑</div>
+    <div class="v num" style="color:var({{ '--warn' if q.unmapped_count else '--pos' }})">{{ q.unmapped_count }}<span class="u">건</span></div>
+    <div class="d">{{ q.unmapped_amount|comma }}원 계산 누락</div></div>
+  <div class="kpi"><div class="k">등록된 매핑 규칙</div><div class="v num">{{ rule_count }}<span class="u">개</span></div>
+    <div class="d">{{ q.channels_collected }}개 채널</div></div>
+  <div class="kpi"><div class="k">기간</div><div class="v num" style="font-size:20px">{{ period }}</div>
+    <div class="d">미매핑 큐</div></div>
+</div>
+
+{% if groups %}
+<div class="banner warn"><div class="bi">⚠</div><div>
+  <div class="bt">미매핑 {{ q.unmapped_count }}건 = {{ q.unmapped_amount|comma }}원이 손익에서 빠져 있습니다</div>
+  <div class="bd">매핑을 마치면 정산 대사 오차가 0이 됩니다.</div></div></div>
+{% else %}
+<div class="banner pos"><div class="bi">✓</div><div>
+  <div class="bt">미매핑 없음 — {{ period }}의 모든 주문이 딜에 연결되어 있습니다</div></div></div>
+{% endif %}
+
+<div class="g-2-1">
+  <div class="card">
+    <div class="card-hd"><h2>미매핑 처리</h2><span class="note">{{ groups|length }}건 · 매출 큰 순</span></div>
+    <div class="card-bd">
+      {% for g in groups %}
+      <div class="item">
+        <div class="hdr"><span class="tag">{{ g.channel_name }}</span>
+          <span>{{ g.count }}건 · {{ g.amount|comma }}원</span>
+          {% if g.special %}<span style="margin-left:auto" class="psub">⚠ 증정품·복합세트로 보입니다</span>{% endif %}</div>
+        <div class="map">
+          <div class="from"><div class="n">{{ g.product }}</div><div class="o">옵션: {{ g.option }}</div></div>
+          <div class="ar">→</div>
+          <div class="to">
+            {% for s in g.suggestions %}
+            <form method="post" action="/mapping/accept" class="sug">
+              <input type="hidden" name="channel_id" value="{{ g.channel_id }}">
+              <input type="hidden" name="product" value="{{ g.product }}">
+              <input type="hidden" name="option" value="{{ g.option }}">
+              <input type="hidden" name="deal_id" value="{{ s.deal_id }}">
+              <input type="hidden" name="period" value="{{ period }}">
+              <span class="pname" style="font-size:12.5px">{{ s.label }} · {{ tier_ko(s.tier) }} {{ s.price|comma }}</span>
+              <span class="pct {{ '' if s.score>=0.85 else 'lo' }}">{{ (s.score*100)|round|int }}%</span>
+              <button class="btn btn-sm btn-pri" type="submit">매핑</button>
+            </form>
+            {% else %}
+            <div class="sug" style="border-style:dashed"><span class="psub">유사한 딜을 찾지 못했습니다</span></div>
+            {% endfor %}
+          </div>
+        </div>
+        {% if g.special %}
+        <div class="psub" style="margin-top:9px;line-height:1.6">
+          증정품이나 복합 세트는 기존 딜에 붙이면 <b>원가가 틀어집니다.</b>
+          구성 SKU를 모두 담은 <b>새 딜</b>로 등록해야 합니다 (PRD §8.4).</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-hd"><h2>채널별 매핑 현황</h2></div>
+      <div class="card-bd">
+        <table class="t" style="font-size:12.5px">
+          <thead><tr><th>채널</th><th class="r">규칙</th><th class="r">미매핑</th><th class="r">매핑률</th></tr></thead>
+          <tbody>{% for c in by_channel %}<tr><td>{{ c.name }}</td>
+            <td class="r num">{{ c.rules }}</td>
+            <td class="r num" {% if c.unmapped %}style="color:var(--warn)"{% endif %}>{{ c.unmapped }}</td>
+            <td class="r num" style="font-weight:650;color:var({{ '--pos' if c.rate>=0.999 else '--warn' }})">{{ c.rate|pct1 }}</td></tr>{% endfor %}</tbody>
+        </table>
+        <div style="margin-top:14px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+            <span class="psub">전체 매핑률</span><span style="font-weight:650">{{ q.mapping_rate|pct1 }}</span></div>
+          <div class="gauge"><div style="width:{{ (q.mapping_rate*100)|round(1) }}%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><h2>왜 매핑이 필요한가</h2></div>
+      <div class="card-bd">
+        <div class="psub" style="line-height:1.7;margin-bottom:12px">같은 제품인데 채널마다 이렇게 표기됩니다.</div>
+        <table class="t" style="font-size:12px"><tbody>
+          <tr><td class="psub" style="width:78px">제품 DB</td><td class="pname">온담키친 원팟 한알육수 (80정)</td></tr>
+          <tr><td class="psub">대림홈쇼핑</td><td>온담키친 원팟 한알육수 코인 육수 멸치 동전 80정</td></tr>
+          <tr><td class="psub">글로벌엑스</td><td>Ondam Kitchen One-Pot Coin Broth Anchovy 80 Tablets</td></tr>
+          <tr><td class="psub">굿마켓</td><td>[여름특가] 온담키친 원팟 한알육수 80정 2개세트</td></tr>
+        </tbody></table>
+        <div class="psub" style="margin-top:12px;padding-top:11px;border-top:1px dashed var(--border-2);line-height:1.65">
+          한 번 매핑하면 규칙으로 저장되어 다음 달부터 자동 적용됩니다.
+          <b>새 상품·새 행사명이 생길 때만</b> 여기로 올라옵니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>월별 수익률 대시보드</title>
+<style>
+:root{
+  --bg:#f6f7f9; --surface:#fff; --surface-2:#eef0f4; --line:#e2e5ea;
+  --text:#111827; --text-2:#4b5563; --text-3:#9ca3af;
+  --pos:#0f9d58; --warn:#e8a33d; --neg:#dc3545; --accent:#3b5bdb;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#0e1116; --surface:#161a21; --surface-2:#1e242e; --line:#2a3039;
+  --text:#e8eaed; --text-2:#9aa3af; --text-3:#6b7280;
+  --pos:#37c07b; --warn:#f0b555; --neg:#f2666f; --accent:#7d93f7;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1116; --surface:#161a21; --surface-2:#1e242e; --line:#2a3039;
+  --text:#e8eaed; --text-2:#9aa3af; --text-3:#6b7280;
+  --pos:#37c07b; --warn:#f0b555; --neg:#f2666f; --accent:#7d93f7;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",
+  "Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 64px}
+header{display:flex;align-items:flex-end;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;margin-bottom:22px}
+h1{margin:0;font-size:22px;letter-spacing:-.02em}
+.sub{color:var(--text-2);font-size:13px;margin-top:4px}
+.tagm{display:inline-block;background:var(--surface-2);color:var(--text-2);
+  border-radius:999px;padding:3px 10px;font-size:11.5px;border:1px solid var(--line)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.kpi .l{font-size:12px;color:var(--text-2)}
+.kpi .v{font-size:24px;font-weight:680;letter-spacing:-.02em;margin-top:6px}
+.kpi .d{font-size:11.5px;color:var(--text-3);margin-top:4px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 2px;font-size:15px;letter-spacing:-.01em}
+.card .cap{color:var(--text-2);font-size:12.5px;margin-bottom:14px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:11.5px;color:var(--text-2);font-weight:600;text-transform:none}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:last-child td{border-bottom:none}
+tfoot td{border-top:2px solid var(--line);border-bottom:none;font-weight:680;padding-top:11px}
+.pos{color:var(--pos)}.neg{color:var(--neg)}.warn{color:var(--warn)}
+.bar{position:relative;height:6px;background:var(--surface-2);border-radius:3px;
+  min-width:70px;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:0;border-radius:3px;display:block}
+.alert{background:color-mix(in srgb,var(--neg) 9%,var(--surface));
+  border:1px solid color-mix(in srgb,var(--neg) 34%,var(--line))}
+.trend{display:flex;gap:10px;align-items:flex-end;height:130px;padding-top:8px}
+.trend div{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+  align-items:center;gap:5px}
+.trend .b{width:100%;background:var(--accent);border-radius:4px 4px 0 0;min-height:3px}
+.trend .p{width:100%;background:var(--pos);border-radius:0 0 4px 4px;min-height:2px;opacity:.75}
+.trend .lb{font-size:10.5px;color:var(--text-3)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}
+.foot{color:var(--text-3);font-size:11.5px;margin-top:26px;line-height:1.7}
+.legend{display:flex;gap:14px;font-size:11.5px;color:var(--text-2);margin-top:10px}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;
+  margin-right:5px;vertical-align:-1px}
+.legend .r::before{background:var(--accent)}.legend .g::before{background:var(--pos)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const D = {"period":"2026-07","totals":{"revenue":77667300,"fee":8711768,"cogs":52072450,"logistics":10928600,"profit":5954482,"margin":0.0766665250369203,"orders":3707,"qty":3707},"quality":{"unmapped_count":7,"unmapped_amount":214300,"mapping_rate":0.998115239633818},"channels":[{"name":"한빛홈쇼핑","orders":1255,"revenue":26728500,"fee":2539680,"cogs":17939840,"logistics":3765000,"profit":2483980,"margin":0.09293375984436089,"rate":0.095},{"name":"스위프트 풀필먼트","orders":962,"revenue":22497800,"fee":2474758,"cogs":15549400,"logistics":2693600,"profit":1780042,"margin":0.07912071402537137,"rate":0.11000000000000001},{"name":"몰이십일","orders":769,"revenue":14613100,"fee":1899703,"cogs":9537850,"logistics":2307000,"profit":868547,"margin":0.05943619081509057,"rate":0.13},{"name":"굿마켓","orders":570,"revenue":10562000,"fee":1373060,"cogs":6826340,"logistics":1710000,"profit":652600,"margin":0.061787540238591177,"rate":0.13},{"name":"비드나우","orders":151,"revenue":3265900,"fee":424567,"cogs":2219020,"logistics":453000,"profit":169313,"margin":0.0518426773630546,"rate":0.13}],"products":[{"name":"온담 무균 즉석밥 210g 24개입","qty":644,"revenue":16787600,"profit":1293447,"margin":0.0770477614429698},{"name":"온담 생유산균 30포","qty":81,"revenue":2016900,"profit":804654,"margin":0.3989558232931727},{"name":"온담 프로틴 쉐이크 30포","qty":104,"revenue":2901600,"profit":793624,"margin":0.2735125448028674},{"name":"온담 3겹 데코 화장지 30롤","qty":731,"revenue":18503900,"profit":681531,"margin":0.0368317489826469},{"name":"온담 캡형 물티슈 100매 10팩","qty":425,"revenue":6198500,"profit":520119,"margin":0.08391046220859885},{"name":"온담 하루견과 20봉","qty":116,"revenue":1960400,"profit":428504,"margin":0.21857988165680473},{"name":"온담 간편 즉석국 15개입","qty":126,"revenue":2885400,"profit":280098,"margin":0.09707423580786026},{"name":"온담 볶음 김자반 4개입","qty":70,"revenue":1043000,"profit":215880,"margin":0.20697986577181207},{"name":"온담 알티지 오메가3 60캡슐","qty":42,"revenue":793800,"profit":199206,"margin":0.2509523809523809},{"name":"온담 비타민D 3000IU 90정","qty":105,"revenue":1144500,"profit":160965,"margin":0.1406422018348624},{"name":"온담 살코기 참치캔 150g 12개","qty":63,"revenue":1379700,"profit":159453,"margin":0.11557077625570776},{"name":"온담 지퍼백 대용량 3종","qty":81,"revenue":1044900,"profit":155763,"margin":0.14906976744186046},{"name":"온담 콜드브루 원액 6병","qty":119,"revenue":2011100,"profit":143157,"margin":0.07118343195266272},{"name":"온담 곤약젤리 10팩","qty":56,"revenue":890400,"profit":108248,"margin":0.12157232704402515},{"name":"온담 종이컵 1000개입","qty":52,"revenue":1138800,"profit":106756,"margin":0.09374429223744292},{"name":"온담 밀크씨슬 90정","qty":73,"revenue":941700,"profit":87819,"margin":0.09325581395348838},{"name":"온담 벤토나이트 고양이모래 10L 2개","qty":99,"revenue":1772100,"profit":32769,"margin":0.018491620111731843},{"name":"온담 커피캡슐 100개입","qty":143,"revenue":3846700,"profit":20163,"margin":0.005241635687732342},{"name":"온담 강아지 수제 간식스틱 50개","qty":105,"revenue":2299500,"profit":5565,"margin":0.002420091324200913},{"name":"온담 주방세제 1L 3개","qty":122,"revenue":1451800,"profit":366,"margin":0.00025210084033613445},{"name":"온담 섬유유연제 2L 2개","qty":85,"revenue":1011500,"profit":-37995,"margin":-0.03756302521008403},{"name":"온담 닭가슴살 100g 20팩","qty":110,"revenue":3179000,"profit":-49060,"margin":-0.015432525951557093},{"name":"온담 얼큰라면 20개입 멀티팩","qty":155,"revenue":2464500,"profit":-156550,"margin":-0.06352201257861635}],"losses":[{"channel":"한빛홈쇼핑","name":"온담 얼큰라면 20개입 멀티팩 ×20","tier":"SPECIAL","price":15900,"orders":155,"revenue":2464500,"profit":-156550,"margin":-0.06352201257861635},{"channel":"몰이십일","name":"온담 섬유유연제 2L 2개 ×2","tier":"SPECIAL","price":11900,"orders":85,"revenue":1011500,"profit":-37995,"margin":-0.03756302521008403},{"channel":"한빛홈쇼핑","name":"온담 닭가슴살 100g 20팩 ×20","tier":"SPECIAL","price":28900,"orders":110,"revenue":3179000,"profit":-49060,"margin":-0.015432525951557093}],"weeks":[{"week":"2026-W28","revenue":15341100,"profit":1377966,"margin":0.0898218511058529},{"week":"2026-W29","revenue":26242400,"profit":1737244,"margin":0.06619989025394019},{"week":"2026-W30","revenue":18301900,"profit":1549378,"margin":0.08465667499002835},{"week":"2026-W31","revenue":17781900,"profit":1289894,"margin":0.07253971735303877}]};
+
+const won = n => (n===null||n===undefined) ? "—" : Math.round(n).toLocaleString("ko-KR");
+const pct = (n,d=2) => (n===null||n===undefined) ? "—" : (n*100).toFixed(d)+"%";
+const cls = m => m===null||m===undefined ? "" : (m<0 ? "neg" : m<0.05 ? "warn" : "pos");
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+function mbar(m){
+  if(m===null||m===undefined) return "—";
+  const c = m<0 ? "var(--neg)" : m<0.05 ? "var(--warn)" : "var(--pos)";
+  const w = Math.min(Math.abs(m)/0.35,1)*100;
+  return `<div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+    <div class="bar"><i style="width:${w.toFixed(0)}%;background:${c}"></i></div>
+    <b style="color:${c};min-width:58px;text-align:right">${pct(m)}</b></div>`;
+}
+
+const t = D.totals, q = D.quality;
+const share = k => t.revenue ? (t[k]/t.revenue*100).toFixed(1)+"%" : "—";
+
+let h = `
+<header>
+  <div>
+    <h1>월별 수익률 대시보드</h1>
+    <div class="sub">${D.period} · 활성 채널 ${D.channels.length}곳 · 주문 ${won(t.orders)}건</div>
+  </div>
+  <span class="tagm">목업 데이터 · 실존 기업과 무관</span>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="l">총매출</div><div class="v">${won(t.revenue)}<span style="font-size:14px;font-weight:400"> 원</span></div>
+    <div class="d">판매수량 ${won(t.qty)}개</div></div>
+  <div class="kpi"><div class="l">기여이익</div><div class="v ${cls(t.margin)}">${won(t.profit)}<span style="font-size:14px;font-weight:400"> 원</span></div>
+    <div class="d">주문당 ${won(t.profit/t.orders)}원</div></div>
+  <div class="kpi"><div class="l">마진율</div><div class="v ${cls(t.margin)}">${pct(t.margin)}</div>
+    <div class="d">수수료 ${share("fee")} · 원가 ${share("cogs")} · 물류 ${share("logistics")}</div></div>
+  <div class="kpi"><div class="l">미매핑</div><div class="v ${q.unmapped_count?"warn":""}">${won(q.unmapped_count)}<span style="font-size:14px;font-weight:400"> 건</span></div>
+    <div class="d">${won(q.unmapped_amount)}원 · 매핑률 ${pct(q.mapping_rate,1)}</div></div>
+</div>`;
+
+if(D.losses.length){
+  const ls = D.losses.reduce((a,r)=>a+r.profit,0);
+  h += `<div class="card alert">
+    <h2 class="neg">적자 딜 ${D.losses.length}건 — 이번 달 손실 ${won(-ls)}원</h2>
+    <div class="cap">팔수록 손해입니다. 가격을 올리거나, 수수료가 낮은 채널로 옮기거나, 구성을 바꿔야 합니다.</div>
+    <div class="scroll"><table>
+      <thead><tr><th>채널</th><th>제품(딜)</th><th class="n">판매가</th><th class="n">주문</th>
+        <th class="n">매출</th><th class="n">기여이익</th><th class="n">마진율</th></tr></thead>
+      <tbody>${D.losses.map(r=>`<tr><td>${esc(r.channel)}</td><td>${esc(r.name)}</td>
+        <td class="n">${won(r.price)}</td><td class="n">${won(r.orders)}</td>
+        <td class="n">${won(r.revenue)}</td><td class="n neg">${won(r.profit)}</td>
+        <td class="n">${mbar(r.margin)}</td></tr>`).join("")}</tbody>
+    </table></div></div>`;
+}
+
+h += `<div class="card">
+  <h2>채널별 손익</h2>
+  <div class="cap">매출 순. 같은 제품을 팔아도 수수료율이 다르면 남는 돈이 달라집니다.</div>
+  <div class="scroll"><table>
+    <thead><tr><th>채널</th><th class="n">수수료율</th><th class="n">주문</th><th class="n">매출</th>
+      <th class="n">수수료</th><th class="n">원가</th><th class="n">물류비</th>
+      <th class="n">기여이익</th><th class="n">마진율</th></tr></thead>
+    <tbody>${D.channels.map(c=>`<tr><td><b>${esc(c.name)}</b></td>
+      <td class="n">${pct(c.rate,1)}</td><td class="n">${won(c.orders)}</td>
+      <td class="n">${won(c.revenue)}</td><td class="n">${won(c.fee)}</td>
+      <td class="n">${won(c.cogs)}</td><td class="n">${won(c.logistics)}</td>
+      <td class="n"><b>${won(c.profit)}</b></td><td class="n">${mbar(c.margin)}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td>합계</td><td class="n">${pct(t.fee/t.revenue,1)}</td>
+      <td class="n">${won(t.orders)}</td><td class="n">${won(t.revenue)}</td>
+      <td class="n">${won(t.fee)}</td><td class="n">${won(t.cogs)}</td>
+      <td class="n">${won(t.logistics)}</td><td class="n">${won(t.profit)}</td>
+      <td class="n">${pct(t.margin)}</td></tr></tfoot>
+  </table></div></div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>제품별 기여이익</h2>
+    <div class="cap">이익 순 상위 12개. 매출 1위와 이익 1위는 대개 다릅니다.</div>
+    <div class="scroll"><table style="min-width:0">
+      <thead><tr><th>제품</th><th class="n">수량</th><th class="n">매출</th>
+        <th class="n">기여이익</th><th class="n">마진율</th></tr></thead>
+      <tbody>${D.products.slice(0,12).map(p=>`<tr><td>${esc(p.name)}</td>
+        <td class="n">${won(p.qty)}</td><td class="n">${won(p.revenue)}</td>
+        <td class="n ${cls(p.margin)}">${won(p.profit)}</td>
+        <td class="n ${cls(p.margin)}">${pct(p.margin)}</td></tr>`).join("")}</tbody>
+    </table></div></div>
+
+  <div class="card">
+    <h2>주별 추이</h2>
+    <div class="cap">막대 위=매출, 아래=기여이익. 특가 비중이 오르는 주에 마진율이 눌립니다.</div>
+    <div class="trend">${(()=>{ const mx=Math.max(...D.weeks.map(w=>w.revenue),1),
+      pm=Math.max(...D.weeks.map(w=>Math.abs(w.profit)),1);
+      return D.weeks.map(w=>`<div>
+        <div class="b" style="height:${(w.revenue/mx*74).toFixed(0)}px"></div>
+        <div class="p" style="height:${(Math.abs(w.profit)/pm*30).toFixed(0)}px"></div>
+        <div class="lb">${esc(w.week.slice(5))}</div>
+        <div class="lb ${cls(w.margin)}">${pct(w.margin,1)}</div></div>`).join(""); })()}</div>
+    <div class="legend"><span class="r">매출</span><span class="g">기여이익</span></div>
+  </div>
+</div>
+
+<div class="foot">
+  기여이익 = 순매출 − 채널 수수료 − 원가 − 물류비 &nbsp;·&nbsp; 마진율 = 기여이익 ÷ 순매출<br>
+  이 페이지는 <code>docs/lecture/실습데이터_생성.py</code> 가 만든 정답지입니다.
+  회사·제품·채널·금액은 전부 가상이며 실존 기업과 무관합니다.
+</div>`;
+
+document.getElementById("app").innerHTML = h;
+</script>
+</body>
+</html>

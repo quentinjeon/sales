@@ -1,0 +1,127 @@
+# ══════════════════════════════════════════════════════════════════════
+#  디어스트 수익률 관리 시스템 — .gitignore
+#
+#  원칙
+#   1. 비밀정보는 절대 올리지 않는다
+#   2. 실매출 원자료는 올리지 않는다 (사업자번호·거래처 정보 포함)
+#   3. 재생성 가능한 것은 올리지 않는다 (DB, 가상환경, 캐시)
+#   4. 폴더 구조와 문서는 올린다 (인계에 필요)
+# ══════════════════════════════════════════════════════════════════════
+
+# ── 1. 비밀정보 ────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.netrc
+credentials.json
+service-account*.json
+secrets.*
+*.secret
+
+# ── 2. 실매출 원자료 ───────────────────────────────────────────────────
+# 채널 판매 데이터에는 실매출·사업자등록번호가 들어 있다.
+# 저장소가 언젠가 공개되거나 외부에 공유될 수 있으므로 내용은 올리지 않고
+# 폴더 구조와 안내 문서만 버전 관리한다.
+
+# 수집함 — 폴더 구조와 README 만 남기고 파일은 제외
+docs/inbox/**
+!docs/inbox/
+!docs/inbox/**/
+!docs/inbox/README.md
+!docs/inbox/**/.gitkeep
+
+# 최초 제공받은 원본 자료 (4~5월 채널 정산 파일, 제품별가격표)
+# → 내용은 app/seed/data.py 와 PRD §17 에 전부 반영되어 있다.
+#   원본이 필요하면 담당자에게 요청할 것.
+docs/upload/
+
+# 내보낸 리포트
+exports/
+*.xlsx.tmp
+
+# ── 3. 런타임 상태 ─────────────────────────────────────────────────────
+# DB 는 `python -m app.cli init && python -m app.demo` 로 언제든 재생성된다.
+data/
+*.db
+*.sqlite
+*.sqlite3
+*-journal
+*-wal
+*-shm
+
+# 업로드된 원본 파일 저장소
+uploads/
+
+# ── 4. Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+pip-log.txt
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
+
+# 테스트 · 정적분석 캐시
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# ── 5. Node (mock 빌드 도구) ──────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+
+# ── 6. OS · 편집기 ────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── 7. Office 임시파일 ────────────────────────────────────────────────
+# 엑셀을 열어둔 채로 커밋하면 잠금 파일이 딸려 들어간다
+~$*.xls
+~$*.xlsx
+~$*.doc*
+~$*.ppt*
+.~lock.*
+
+# ── 8. 로그 · 임시 ────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+.tmp/
+.cache/
+*.pid
+
+# ── 9. Claude Code 로컬 설정 ──────────────────────────────────────────
+# CLAUDE.md 는 인계 문서이므로 올린다. 로컬 권한 설정만 제외.
+.claude/settings.local.json
+.claude/**/cache/

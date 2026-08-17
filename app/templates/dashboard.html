@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}수익률 대시보드 · 온담식품 수익률{% endblock %}
+{% block h1 %}수익률 대시보드{% endblock %}
+{% block sub %}{{ period_label }} · 활성 {{ q.channels_active }}개 채널 · 주문 {{ t.orders|comma }}건{% endblock %}
+
+{% block style %}<style>
+.trend { display:flex; align-items:flex-end; gap:10px; height:150px; }
+.trend .col { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; height:100%; }
+.trend .stack2 { width:100%; display:flex; flex-direction:column; justify-content:flex-end; height:100%; }
+.trend .rev { background:var(--accent); opacity:.22; border-radius:4px 4px 0 0; }
+.trend .prf { background:var(--accent); border-radius:0 0 4px 4px; }
+.trend .lb { font-size:11px; color:var(--text-3); }
+.trend .pc { font-size:11.5px; font-weight:650; }
+.legend { display:flex; gap:14px; font-size:11.5px; color:var(--text-3); margin-top:10px; justify-content:center; }
+.legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.mixbar { display:flex; height:26px; border-radius:6px; overflow:hidden; }
+.mixbar div { display:grid; place-items:center; font-size:11px; font-weight:650; color:#fff; }
+.mixbar div.slim { font-size:10px; }
+.chtbl td, .chtbl th { white-space:nowrap; }
+.chtbl td:first-child { min-width:132px; }
+</style>{% endblock %}
+
+{% block actions %}
+  <a class="chip {{ 'on' if ptype=='MONTH' }}" href="/?period={{ month }}&type=MONTH">월별</a>
+  <a class="chip {{ 'on' if ptype=='WEEK' }}" href="/?period={{ default_week }}&type=WEEK">주별</a>
+  <select class="sel" onchange="location='/?type={{ ptype }}&period='+this.value">
+    {% for p in periods %}<option value="{{ p }}" {{ 'selected' if p==period }}>{{ p }}</option>{% endfor %}
+  </select>
+  <a class="btn" href="/export?period={{ period }}&type={{ ptype }}">내보내기</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpis">
+  <div class="kpi"><div class="k">총매출</div><div class="v num">{{ t.revenue|comma }}<span class="u">원</span></div>
+    <div class="d">{{ delta(t.revenue, prev.revenue) }}</div></div>
+  <div class="kpi"><div class="k">기여이익</div><div class="v num">{{ t.profit|comma }}<span class="u">원</span></div>
+    <div class="d">{{ delta(t.profit, prev.profit) }}</div></div>
+  <div class="kpi" style="border-color:color-mix(in srgb,var(--warn) 35%,var(--border))">
+    <div class="k">평균 마진율</div>
+    <div class="v num" style="color:var(--warn)">{{ t.margin|pct2 }}</div>
+    <div class="d">{{ delta_pp(t.margin, prev.margin) }}</div></div>
+  <div class="kpi"><div class="k">주문 건수</div><div class="v num">{{ t.orders|comma }}<span class="u">건</span></div>
+    <div class="d">건당 이익 <b>{{ t.profit_per_order|comma }}원</b></div></div>
+  <div class="kpi"><div class="k">적자 딜 손실</div>
+    <div class="v num" style="color:var(--neg)">{{ loss_sum|comma }}<span class="u">원</span></div>
+    <div class="d">딜 {{ losses|length }}개 · {{ loss_orders|comma }}건</div></div>
+</div>
+
+{% if losses %}
+<div class="banner neg">
+  <div class="bi">🚨</div>
+  <div><div class="bt">적자 딜 {{ losses|length }}건 — 이번 기간 손실 {{ (0-loss_sum)|comma }}원</div>
+    <div class="bd">
+      {% for r in losses %}<b>{{ r.name }} {{ r.extra.price|comma }}원 ({{ r.sub }})</b>
+      {{ r.orders|comma }}건 {{ r.profit|comma }}원 ({{ r.margin|pct2 }}){% if not loop.last %} · {% endif %}{% endfor %}
+    </div></div>
+  <div class="right"><a href="/deals?period={{ period }}&type={{ ptype }}&status=loss" class="btn btn-sm">딜 상세 →</a></div>
+</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:16px">
+  <div class="card-hd"><h2>채널별 손익</h2><span class="note">매출 순</span>
+    <div class="right"><a href="/channels" class="btn btn-sm">＋ 채널 추가</a></div></div>
+  <div class="tw"><table class="t chtbl">
+    <thead><tr><th>채널</th><th class="c">수수료율</th><th class="r">주문</th><th class="r">매출</th>
+      <th class="r">수수료</th><th class="r">원가</th><th class="r">물류비</th>
+      <th class="r">기여이익</th><th class="r" style="min-width:140px">마진율</th></tr></thead>
+    <tbody>
+    {% for r in channels %}
+      <tr>
+        <td><a class="pname plain" href="/deals?period={{ period }}&type={{ ptype }}&channel={{ r.key }}">{{ r.name }}</a>
+          <span class="psub">{{ r.sub }}</span>
+          {% if r.extra.estimated %}<span class="tag warn" style="margin-left:4px">추정</span>{% endif %}</td>
+        <td class="c num">{{ r.extra.fee_rate|pct1 }}</td>
+        <td class="r num">{{ r.orders|comma }}</td><td class="r num">{{ r.revenue|comma }}</td>
+        <td class="r num">{{ r.fee|comma }}</td><td class="r num">{{ r.cogs|comma }}</td>
+        <td class="r num">{{ r.logistics|comma }}</td>
+        <td class="r num" style="font-weight:650">{{ r.profit|comma }}</td>
+        <td class="r">{{ mbar(r.margin, r.level) }}</td>
+      </tr>
+    {% endfor %}
+      <tr style="opacity:.55"><td colspan="9" style="text-align:center;padding:11px;font-size:12.5px;color:var(--text-3)">
+        대기 중인 채널 {{ waiting_count }}개 — <a href="/channels" class="plain">채널 관리에서 활성화</a></td></tr>
+    </tbody>
+    <tfoot><tr><td>합계</td><td class="c num">{{ (t.fee/t.revenue if t.revenue else 0)|pct1 }}</td>
+      <td class="r num">{{ t.orders|comma }}</td><td class="r num">{{ t.revenue|comma }}</td>
+      <td class="r num">{{ t.fee|comma }}</td><td class="r num">{{ t.cogs|comma }}</td>
+      <td class="r num">{{ t.logistics|comma }}</td><td class="r num">{{ t.profit|comma }}</td>
+      <td class="r"><div class="mbar"><span class="val">{{ t.margin|pct2 }}</span></div></td></tr></tfoot>
+  </table></div>
+</div>
+
+<div class="g-2-1">
+  <div class="stack">
+    <div class="card">
+      <div class="card-hd"><h2>제품별 이익 기여</h2><span class="note">전 채널 합산 · 이익 순</span>
+        <div class="right"><a href="/deals?period={{ period }}&type={{ ptype }}" class="btn btn-sm">전체 보기</a></div></div>
+      <div class="tw"><table class="t">
+        <thead><tr><th>제품</th><th class="r">판매</th><th class="r">매출</th><th class="r">기여이익</th>
+          <th class="r" style="min-width:140px">마진율</th></tr></thead>
+        <tbody>{% for r in products %}
+          <tr class="{{ 'tr-neg' if r.level=='neg' else ('tr-warn' if r.level=='warn' else '') }}">
+            <td class="pname">{{ r.name }}</td><td class="r num">{{ r.qty|comma }}</td>
+            <td class="r num">{{ r.revenue|comma }}</td>
+            <td class="r num" {% if r.profit<0 %}style="color:var(--neg)"{% endif %}>{{ r.profit|comma }}</td>
+            <td class="r">{{ mbar(r.margin, r.level) }}</td></tr>
+        {% endfor %}</tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>가격 티어별</h2></div>
+      <div class="card-bd"><table class="t" style="font-size:12.5px">
+        <thead><tr><th>티어</th><th class="r">매출</th><th class="r">비중</th><th class="r">마진율</th></tr></thead>
+        <tbody>{% for r in tiers %}
+          <tr><td><span class="tag {{ 'pos' if r.name=='EVENT' else ('warn' if r.name=='SPECIAL' else 'mut') }}">{{ tier_ko(r.name) }}</span></td>
+            <td class="r num">{{ r.revenue|comma }}</td>
+            <td class="r num">{{ (r.revenue/t.revenue if t.revenue else 0)|pct1 }}</td>
+            <td class="r num" style="font-weight:650;color:var({{ '--pos' if r.margin>=0.05 else '--warn' }})">{{ r.margin|pct2 }}</td></tr>
+        {% endfor %}</tbody>
+      </table>
+      {% if tier_note %}<div class="psub" style="margin-top:11px;line-height:1.6">{{ tier_note }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="stack">
+    {% if trend %}
+    <div class="card">
+      <div class="card-hd"><h2>주차별 추이</h2><span class="note">{{ month }}</span></div>
+      <div class="card-bd">
+        <div class="trend">{% for w in trend %}
+          <div class="col">
+            <span class="pc" style="color:var({{ '--pos' if w.margin>=0.13 else ('--neg' if w.margin<0.115 else '--warn') }})">{{ w.margin|pct2 }}</span>
+            <div class="stack2">
+              <div class="rev" style="height:{{ (w.revenue/trend_max*78)|round|int }}px"></div>
+              <div class="prf" style="height:{{ (w.profit/trend_pmax*24)|round|int }}px"></div>
+            </div>
+            <span class="lb">{{ w.name[-3:] }}</span>
+          </div>{% endfor %}</div>
+        <div class="legend"><span><i style="background:var(--accent);opacity:.22"></i>매출</span><span><i style="background:var(--accent)"></i>기여이익</span></div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card">
+      <div class="card-hd"><h2>매출 100원의 행방</h2></div>
+      <div class="card-bd">
+        <div class="mixbar">
+          <div style="width:{{ share.cogs }}%;background:#8b93a3">원가 {{ share.cogs }}%</div>
+          <div style="width:{{ share.logi }}%;background:#a9b0bd">물류 {{ share.logi }}%</div>
+          <div class="slim" style="width:{{ share.fee }}%;background:#c3c8d2">{{ share.fee }}%</div>
+          <div class="slim" style="width:{{ share.profit }}%;background:var(--pos)">{{ share.profit }}%</div>
+        </div>
+        <dl class="kv" style="margin-top:14px">
+          <dt>상품 원가</dt><dd class="num">{{ t.cogs|comma }}</dd>
+          <dt>물류비</dt><dd class="num">{{ t.logistics|comma }}</dd>
+          <dt>채널 수수료</dt><dd class="num">{{ t.fee|comma }}</dd>
+          <dt style="font-weight:650;color:var(--text)">기여이익</dt><dd class="num" style="color:var(--pos)">{{ t.profit|comma }}</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h2>데이터 품질</h2></div>
+      <div class="card-bd">
+        <dl class="kv">
+          <dt>수집 채널</dt><dd>{{ q.channels_collected }} / {{ q.channels_active }}</dd>
+          <dt>상품명 매핑률</dt><dd style="color:var({{ '--pos' if q.mapping_rate>=0.999 else '--warn' }})">{{ q.mapping_rate|pct1 }}</dd>
+          <dt>미매핑</dt><dd style="color:var({{ '--warn' if q.unmapped_count else '--pos' }})">{{ q.unmapped_count }}건 · {{ q.unmapped_amount|comma }}원</dd>
+          <dt>추정치 매출 비중</dt><dd>{{ q.estimated_revenue_share|pct0 }}</dd>
+        </dl>
+        {% if q.unmapped_count %}
+        <div style="margin-top:12px"><a href="/mapping" class="btn btn-sm" style="width:100%;justify-content:center">미매핑 {{ q.unmapped_count }}건 처리 →</a></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
