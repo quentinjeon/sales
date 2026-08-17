@@ -115,7 +115,6 @@ ing.load_sales(db, "docs/lecture/실습데이터/03_매출_2026-07.xlsx", period
 - 월말 정산 대사 (`reconciliation` 테이블은 있으나 미사용)
 - 미사용 모델 정리 — `FileFormat` `FileReject` `ProfitMart` `Reconciliation` `AuditLog`,
   `SalesLine.discount_amount` `shipping_charged`, `report.weeks_in_month()`
-- 화면 캡처 재촬영 (`docs/Screenshot/` 은 구 데이터라 삭제함)
 
 ---
 
@@ -160,6 +159,7 @@ ing.load_sales(db, "docs/lecture/실습데이터/03_매출_2026-07.xlsx", period
 
 | 문서 | 내용 |
 |---|---|
+| [docs/프로그램-소개.md](docs/프로그램-소개.md) | 화면 6장으로 보는 프로그램 소개 |
 | [docs/PRD.md](docs/PRD.md) | **개발 명세** — 입력·계산·화면·검수 기준. AI에게 그대로 주는 용도 |
 | [docs/목업데이터-소개.md](docs/목업데이터-소개.md) | 상품 DB · 채널 DB · 매출 데이터 · 결과 리포트 설명 |
 | [docs/lecture/README.md](docs/lecture/README.md) | 바이브코딩 수업 진행 순서 |

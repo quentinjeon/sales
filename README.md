@@ -43,7 +43,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 | 문서 | 내용 |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | **인계 문서 — 가장 먼저 읽으세요** |
+| [docs/프로그램-소개.md](docs/프로그램-소개.md) | **화면 6장으로 보는 프로그램 소개** |
+| [CLAUDE.md](CLAUDE.md) | 인계 문서 — 개발하려면 먼저 읽으세요 |
 | [docs/PRD.md](docs/PRD.md) | 개발 명세. 입력·계산·화면·검수 기준 |
 | [docs/목업데이터-소개.md](docs/목업데이터-소개.md) | 상품 DB · 채널 DB · 매출 데이터 · 결과 리포트 |
 | [docs/lecture/README.md](docs/lecture/README.md) | 바이브코딩 수업 진행 순서 |
